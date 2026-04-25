@@ -50,8 +50,6 @@ CREATE TABLE IF NOT EXISTS users (
 COMMENT ON TABLE  users              IS 'Pi Network identities authenticated by Lumina-Core.';
 COMMENT ON COLUMN users.pi_uid       IS 'Immutable Pi Network user identifier.';
 
-CREATE INDEX idx_users_pi_uid ON users (pi_uid);
-
 -- ---------------------------------------------------------------------------
 -- Table: handshake_history
 -- Immutable log of every /auth/pi-handshake attempt.

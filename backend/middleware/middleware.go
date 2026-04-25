@@ -80,7 +80,7 @@ func RequireJWT(next http.Handler) http.Handler {
 		}
 
 		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			if t.Method != jwt.SigningMethodHS256 {
 				return nil, jwt.ErrSignatureInvalid
 			}
 			return []byte(secret), nil

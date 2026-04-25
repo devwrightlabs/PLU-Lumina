@@ -118,4 +118,4 @@ Validates 2-of-2 signatures and submits the XDR to the Soroban contract.
 
 - JWTs are valid for **15 minutes** only.
 - All endpoints enforce TLS 1.3 in production.
-- Rate limiting: 10 requests/minute per IP on `/auth/pi-handshake`.
+- Planned control: apply rate limiting of 10 requests/minute per IP on `/auth/pi-handshake`.

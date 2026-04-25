@@ -74,9 +74,23 @@ CREATE INDEX idx_handshake_status    ON handshake_history (status);
 CREATE INDEX idx_handshake_created   ON handshake_history (created_at DESC);
 
 -- Prevent any UPDATE or DELETE on this table — records are append-only.
-CREATE RULE handshake_no_update AS ON UPDATE TO handshake_history DO INSTEAD NOTHING;
-CREATE RULE handshake_no_delete AS ON DELETE TO handshake_history DO INSTEAD NOTHING;
+CREATE OR REPLACE FUNCTION prevent_handshake_history_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RAISE EXCEPTION 'handshake_history is append-only; % is not allowed', TG_OP;
+END;
+$$;
 
+DROP RULE IF EXISTS handshake_no_update ON handshake_history;
+DROP RULE IF EXISTS handshake_no_delete ON handshake_history;
+DROP TRIGGER IF EXISTS handshake_history_immutable ON handshake_history;
+
+CREATE TRIGGER handshake_history_immutable
+BEFORE UPDATE OR DELETE ON handshake_history
+FOR EACH ROW
+EXECUTE FUNCTION prevent_handshake_history_mutation();
 -- ---------------------------------------------------------------------------
 -- Table: vaults
 -- Tracks each Sub-Wallet vault provisioned via /vault/create.

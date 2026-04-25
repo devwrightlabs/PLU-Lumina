@@ -52,7 +52,7 @@ PLU-Lumina/
 ├── backend/              # Go REST API server
 │   ├── main.go           # Entry point & route registration
 │   ├── handlers/         # Route handler implementations
-│   ├── middleware/        # JWT auth, rate limiting, logging
+│   ├── middleware/        # JWT auth, logging
 │   └── go.mod            # Go module definition
 ├── contracts/            # Rust/Soroban smart contracts
 │   ├── src/

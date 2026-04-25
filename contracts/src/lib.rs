@@ -9,17 +9,21 @@
 //! initialize(owner, agent)
 //!        │
 //!        ▼
-//! deposit(amount)          ← owner funds the vault
+//! token.transfer(owner, vault_address, amount)   ← owner funds the vault
 //!        │
 //!        ▼
-//! propose_release(tx_id, recipient, amount)   ← owner initiates a release
+//! propose_release(tx_id, recipient, amount)      ← owner initiates a release
 //!        │
 //!        ▼
-//! sign_release(tx_id)      ← lumina agent co-signs
+//! sign_release(tx_id)                            ← lumina agent co-signs
 //!        │
 //!        ▼
-//! execute_release(tx_id)   ← funds transferred, event emitted
+//! execute_release(tx_id)                         ← funds transferred, event emitted
 //! ```
+//!
+//! Deposits are made by sending tokens directly to this contract's address via
+//! the token contract's `transfer` entrypoint; this vault does not expose a
+//! separate `deposit` method.
 //!
 //! All state-mutating functions require the caller to be the authorised
 //! signer for that step.  Neither party alone can move funds.

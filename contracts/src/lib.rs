@@ -346,13 +346,13 @@ mod tests {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    fn setup() -> (Env, Address, Address, Address, MultiSigVaultClient<'static>) {
-        let env         = Env::default();
-        let contract_id = env.register_contract(None, MultiSigVault);
-        let client      = MultiSigVaultClient::new(&env, &contract_id.clone());
+    fn setup() -> (&'static Env, Address, Address, Address, MultiSigVaultClient<'static>) {
+        let env: &'static Env = std::boxed::Box::leak(std::boxed::Box::new(Env::default()));
+        let contract_id       = env.register_contract(None, MultiSigVault);
+        let client            = MultiSigVaultClient::new(env, &contract_id.clone());
 
-        let owner: Address = Address::generate(&env);
-        let agent: Address = Address::generate(&env);
+        let owner: Address = Address::generate(env);
+        let agent: Address = Address::generate(env);
 
         env.mock_all_auths();
         client.initialize(&owner, &agent);

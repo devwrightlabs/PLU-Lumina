@@ -201,6 +201,20 @@ impl MultiSigVault {
         caller.require_auth();
         Self::require_initialised(&env);
 
+        let owner: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Owner)
+            .expect("owner not set");
+        let agent: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Agent)
+            .expect("agent not set");
+
+        if caller != owner && caller != agent {
+            panic!("caller is not authorised to execute release");
+        }
         let key = DataKey::Proposal(tx_id.clone());
         let mut proposal: ReleaseProposal = env
             .storage()

@@ -1,0 +1,25 @@
+[package]
+name = "lumina-multisig-vault"
+version = "0.1.0"
+edition = "2021"
+description = "Lumina-Core MultiSigVault: 2-of-2 Owner + Agent Soroban contract"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { version = "21.0.0", features = ["alloc"] }
+
+[dev-dependencies]
+soroban-sdk = { version = "21.0.0", features = ["testutils", "alloc"] }
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true

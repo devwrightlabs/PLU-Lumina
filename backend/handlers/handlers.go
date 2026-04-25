@@ -205,6 +205,12 @@ func VaultCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	agentKeyBytes, err := hex.DecodeString(agentPubKeyHex)
+	if err != nil || len(agentKeyBytes) != ed25519.PublicKeySize {
+		log.Println("LUMINA_AGENT_PUBLIC_KEY is invalid")
+		writeError(w, http.StatusInternalServerError, "agent key not configured")
+		return
+	}
 	vaultID := deriveVaultID(uid, req.OwnerPublicKey)
 
 	writeJSON(w, http.StatusCreated, vaultCreateResponse{

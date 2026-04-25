@@ -214,7 +214,7 @@ CREATE POLICY users_service_all ON users
 CREATE POLICY handshake_service_all ON handshake_history
     USING (auth.role() = 'service_role');
 
--- vaults: service role full access; authenticated user can read their own vaults
+-- vaults: service role full access
 CREATE POLICY vaults_service_all ON vaults
     USING (auth.role() = 'service_role');
 

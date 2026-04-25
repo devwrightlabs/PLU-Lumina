@@ -26,9 +26,9 @@
 //!
 //! ## Protocol 23 Compliance
 //!
-//! This contract targets Soroban SDK v21 (Protocol 21+ / Stellar Protocol 23
-//! readiness), using the `soroban-sdk` alloc feature for heap allocations and
-//! emitting structured events for every state transition.
+//! This contract targets Stellar Protocol 23 (Soroban GA) using
+//! `soroban-sdk` v21, with the `alloc` feature for heap allocations and
+//! structured events for every state transition.
 
 #![no_std]
 
@@ -59,7 +59,7 @@ pub enum DataKey {
 
 /// Status of a multi-sig release proposal.
 #[contracttype]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ProposalStatus {
     /// Created by the owner; awaiting the agent's countersignature.
     Pending,
@@ -321,14 +321,17 @@ impl MultiSigVault {
 mod tests {
     use super::*;
     use soroban_sdk::{
-        testutils::{Address as _, BytesN as _},
+        testutils::{Address as _},
+        token::{Client as TokenClient, StellarAssetClient},
         Env,
     };
 
-    fn setup() -> (Env, Address, Address, MultiSigVaultClient<'static>) {
-        let env    = Env::default();
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    fn setup() -> (Env, Address, Address, Address, MultiSigVaultClient<'static>) {
+        let env         = Env::default();
         let contract_id = env.register_contract(None, MultiSigVault);
-        let client  = MultiSigVaultClient::new(&env, &contract_id);
+        let client      = MultiSigVaultClient::new(&env, &contract_id.clone());
 
         let owner: Address = Address::generate(&env);
         let agent: Address = Address::generate(&env);
@@ -336,14 +339,29 @@ mod tests {
         env.mock_all_auths();
         client.initialize(&owner, &agent);
 
-        // Box the env to get a 'static lifetime for the client.
-        // In real tests you'd use a single env reference.
-        (env, owner, agent, client)
+        (env, owner, agent, contract_id, client)
     }
+
+    /// Deploy a test Stellar Asset token, mint `amount` to `recipient`, and
+    /// return the token's contract address.
+    fn setup_token(env: &Env, admin: &Address, recipient: &Address, amount: i128) -> Address {
+        let token_id = env.register_stellar_asset_contract_v2(admin.clone());
+        let token_admin = StellarAssetClient::new(env, &token_id.address());
+        token_admin.mint(recipient, &amount);
+        token_id.address()
+    }
+
+    fn make_tx_id(env: &Env, seed: u8) -> BytesN<32> {
+        let mut bytes = [0u8; 32];
+        bytes[0] = seed;
+        BytesN::from_array(env, &bytes)
+    }
+
+    // ── Initialisation ───────────────────────────────────────────────────────
 
     #[test]
     fn test_initialize_stores_owner_and_agent() {
-        let (env, owner, agent, client) = setup();
+        let (_env, owner, agent, _vault_addr, client) = setup();
         assert_eq!(client.get_owner(), owner);
         assert_eq!(client.get_agent(), agent);
     }
@@ -351,8 +369,160 @@ mod tests {
     #[test]
     #[should_panic(expected = "vault already initialised")]
     fn test_double_initialize_panics() {
-        let (env, owner, agent, client) = setup();
+        let (env, owner, agent, _vault_addr, client) = setup();
         env.mock_all_auths();
         client.initialize(&owner, &agent);
+    }
+
+    // ── propose_release ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_propose_release_creates_pending_proposal() {
+        let (env, owner, _agent, vault_addr, client) = setup();
+        env.mock_all_auths();
+
+        let token     = setup_token(&env, &owner, &vault_addr, 1_000);
+        let tx_id     = make_tx_id(&env, 1);
+        let recipient = Address::generate(&env);
+
+        client.propose_release(&tx_id, &recipient, &500, &token);
+
+        let proposal = client.get_proposal(&tx_id);
+        assert_eq!(proposal.status, ProposalStatus::Pending);
+        assert!(proposal.owner_signed);
+        assert!(!proposal.agent_signed);
+        assert_eq!(proposal.amount, 500);
+    }
+
+    #[test]
+    #[should_panic(expected = "release amount must be positive")]
+    fn test_propose_release_zero_amount_panics() {
+        let (env, owner, _agent, vault_addr, client) = setup();
+        env.mock_all_auths();
+
+        let token     = setup_token(&env, &owner, &vault_addr, 0);
+        let tx_id     = make_tx_id(&env, 2);
+        let recipient = Address::generate(&env);
+
+        client.propose_release(&tx_id, &recipient, &0, &token);
+    }
+
+    #[test]
+    #[should_panic(expected = "proposal with this tx_id already exists")]
+    fn test_duplicate_tx_id_panics() {
+        let (env, owner, _agent, vault_addr, client) = setup();
+        env.mock_all_auths();
+
+        let token     = setup_token(&env, &owner, &vault_addr, 1_000);
+        let tx_id     = make_tx_id(&env, 3);
+        let recipient = Address::generate(&env);
+
+        client.propose_release(&tx_id, &recipient, &100, &token);
+        client.propose_release(&tx_id, &recipient, &100, &token);
+    }
+
+    // ── sign_release ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_agent_sign_transitions_to_approved() {
+        let (env, owner, _agent, vault_addr, client) = setup();
+        env.mock_all_auths();
+
+        let token     = setup_token(&env, &owner, &vault_addr, 1_000);
+        let tx_id     = make_tx_id(&env, 4);
+        let recipient = Address::generate(&env);
+
+        client.propose_release(&tx_id, &recipient, &200, &token);
+        client.sign_release(&tx_id);
+
+        let proposal = client.get_proposal(&tx_id);
+        assert_eq!(proposal.status, ProposalStatus::Approved);
+        assert!(proposal.owner_signed);
+        assert!(proposal.agent_signed);
+    }
+
+    #[test]
+    #[should_panic(expected = "proposal is not in Pending state")]
+    fn test_sign_already_approved_panics() {
+        let (env, owner, _agent, vault_addr, client) = setup();
+        env.mock_all_auths();
+
+        let token     = setup_token(&env, &owner, &vault_addr, 1_000);
+        let tx_id     = make_tx_id(&env, 5);
+        let recipient = Address::generate(&env);
+
+        client.propose_release(&tx_id, &recipient, &200, &token);
+        client.sign_release(&tx_id);
+        client.sign_release(&tx_id); // second sign should panic
+    }
+
+    // ── execute_release ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_execute_release_transfers_tokens() {
+        let (env, owner, _agent, vault_addr, client) = setup();
+        env.mock_all_auths();
+
+        let token     = setup_token(&env, &owner, &vault_addr, 1_000);
+        let recipient = Address::generate(&env);
+        let tx_id     = make_tx_id(&env, 6);
+
+        client.propose_release(&tx_id, &recipient, &300, &token);
+        client.sign_release(&tx_id);
+        client.execute_release(&tx_id, &owner);
+
+        let proposal = client.get_proposal(&tx_id);
+        assert_eq!(proposal.status, ProposalStatus::Executed);
+
+        let tok = TokenClient::new(&env, &token);
+        assert_eq!(tok.balance(&recipient), 300);
+    }
+
+    #[test]
+    #[should_panic(expected = "proposal is not Approved")]
+    fn test_execute_unapproved_panics() {
+        let (env, owner, _agent, vault_addr, client) = setup();
+        env.mock_all_auths();
+
+        let token     = setup_token(&env, &owner, &vault_addr, 1_000);
+        let tx_id     = make_tx_id(&env, 7);
+        let recipient = Address::generate(&env);
+
+        // Proposed but NOT signed by agent → still Pending
+        client.propose_release(&tx_id, &recipient, &100, &token);
+        client.execute_release(&tx_id, &owner);
+    }
+
+    // ── cancel_proposal ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_cancel_pending_proposal() {
+        let (env, owner, _agent, vault_addr, client) = setup();
+        env.mock_all_auths();
+
+        let token     = setup_token(&env, &owner, &vault_addr, 1_000);
+        let tx_id     = make_tx_id(&env, 8);
+        let recipient = Address::generate(&env);
+
+        client.propose_release(&tx_id, &recipient, &50, &token);
+        client.cancel_proposal(&tx_id);
+
+        let proposal = client.get_proposal(&tx_id);
+        assert_eq!(proposal.status, ProposalStatus::Cancelled);
+    }
+
+    #[test]
+    #[should_panic(expected = "only Pending proposals can be cancelled")]
+    fn test_cancel_approved_panics() {
+        let (env, owner, _agent, vault_addr, client) = setup();
+        env.mock_all_auths();
+
+        let token     = setup_token(&env, &owner, &vault_addr, 1_000);
+        let tx_id     = make_tx_id(&env, 9);
+        let recipient = Address::generate(&env);
+
+        client.propose_release(&tx_id, &recipient, &50, &token);
+        client.sign_release(&tx_id); // now Approved
+        client.cancel_proposal(&tx_id); // should panic
     }
 }

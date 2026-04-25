@@ -21,6 +21,10 @@ const ContextKeyUID contextKey = "uid"
 
 // ─── RequestLogger ────────────────────────────────────────────────────────────
 
+// MinJWTSecretLen is the minimum acceptable byte length for the JWT_SECRET
+// environment variable.  Both the token issuer and validator enforce this.
+const MinJWTSecretLen = 32
+
 // RequestLogger logs the method, path, and elapsed time of every request.
 func RequestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +73,7 @@ func RequireJWT(next http.Handler) http.Handler {
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
 		secret := os.Getenv("JWT_SECRET")
-		if len(secret) < 32 {
+		if len(secret) < MinJWTSecretLen {
 			log.Println("JWT_SECRET is not configured or too short")
 			http.Error(w, `{"error":"server misconfiguration"}`, http.StatusInternalServerError)
 			return

@@ -109,6 +109,7 @@ func verifyPiAccessToken(accessToken string) (string, error) {
 		return "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-Pi-Api-Key", piAPIKey)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
@@ -136,8 +137,8 @@ func verifyPiAccessToken(accessToken string) (string, error) {
 // issueLuminaJWT creates a signed JWT for the given UID valid until expiresAt.
 func issueLuminaJWT(uid string, expiresAt time.Time) (string, error) {
 	secret := os.Getenv("JWT_SECRET")
-	if len(secret) < 32 {
-		return "", errorf("JWT_SECRET must be at least 32 bytes")
+	if len(secret) < middleware.MinJWTSecretLen {
+		return "", errorf("JWT_SECRET must be at least %d bytes", middleware.MinJWTSecretLen)
 	}
 
 	claims := jwt.MapClaims{
@@ -276,13 +277,15 @@ func SigValidate(w http.ResponseWriter, r *http.Request) {
 
 // validateAndSubmit performs the dual-signature check and submits the
 // transaction to the Stellar network.
-func validateAndSubmit(req sigValidateRequest) (string, error) {
-	// Placeholder: in production this would:
-	// 1. Decode TxEnvelopeXDR from base64.
-	// 2. Verify ownerSignature against the canonical tx hash using the vault's
-	//    stored owner public key.
-	// 3. Verify agentSignature using LUMINA_AGENT_PUBLIC_KEY.
-	// 4. Submit the fully-signed XDR to the Horizon RPC.
-	// 5. Return the resulting transaction hash.
-	return "pending_implementation", nil
+//
+// TODO (Phase 3): Implement the following steps:
+//  1. Decode TxEnvelopeXDR from base64.
+//  2. Verify ownerSignature against the canonical tx hash using the vault's
+//     stored owner public key.
+//  3. Verify agentSignature using LUMINA_AGENT_PUBLIC_KEY.
+//  4. Inject SorobanTransactionData (via simulateTransaction RPC call).
+//  5. Submit the fully-signed XDR to the Stellar Horizon RPC.
+//  6. Return the resulting transaction hash.
+func validateAndSubmit(_ sigValidateRequest) (string, error) {
+	return "", errorf("validateAndSubmit not yet implemented (Phase 3)")
 }

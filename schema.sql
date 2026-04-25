@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS vaults (
 );
 
 COMMENT ON TABLE  vaults                    IS 'Sub-Wallet multi-sig vaults managed by Lumina-Core.';
-COMMENT ON COLUMN vaults.vault_id           IS 'SHA-256² of (uid || owner_public_key); hex-encoded.';
+COMMENT ON COLUMN vaults.vault_id           IS 'SHA-256² of (''lumina-vault-v1:'' || uid || '':'' || owner_public_key); hex-encoded.';
 COMMENT ON COLUMN vaults.soroban_contract_id IS 'Populated once the Soroban MultiSigVault contract is deployed on-chain.';
 
 CREATE INDEX idx_vaults_user_id  ON vaults (user_id);

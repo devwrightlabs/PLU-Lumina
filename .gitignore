@@ -1,0 +1,24 @@
+# Go build artifacts
+backend/lumina-core
+backend/*.exe
+
+# Rust / Cargo build artifacts
+contracts/target/
+
+# Go module download cache (only commit go.sum, not the cache)
+# go.sum is intentionally committed
+
+# Environment files — never commit secrets
+.env
+.env.*
+!.env.example
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Editor artifacts
+.vscode/
+.idea/
+*.swp
+*.swo

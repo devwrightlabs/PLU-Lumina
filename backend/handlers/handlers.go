@@ -172,7 +172,8 @@ type vaultCreateResponse struct {
 //
 // Flow:
 //  1. Validate the owner's Ed25519 public key.
-//  2. Generate a unique vault ID (deterministic: SHA-256 of UID + owner_public_key).
+//  2. Generate a unique vault ID using deriveVaultID (deterministic: versioned
+//     prefix + UID + owner_public_key, hashed with double-SHA-256).
 //  3. Record the vault in the database (handshake_history + vault_balances).
 //  4. Return the vault ID and the Lumina Agent's public key so the frontend
 //     can construct co-signed transactions.

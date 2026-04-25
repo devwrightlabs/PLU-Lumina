@@ -175,9 +175,25 @@ CREATE INDEX idx_sig_events_type    ON sig_events (event_type);
 CREATE INDEX idx_sig_events_created ON sig_events (created_at DESC);
 
 -- Prevent UPDATE/DELETE — sig_events is append-only.
-CREATE RULE sig_events_no_update AS ON UPDATE TO sig_events DO INSTEAD NOTHING;
-CREATE RULE sig_events_no_delete AS ON DELETE TO sig_events DO INSTEAD NOTHING;
+-- Use a trigger that raises an exception so forbidden mutations cannot
+-- appear to succeed silently.
+CREATE OR REPLACE FUNCTION reject_sig_events_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RAISE EXCEPTION 'sig_events is immutable; % is not allowed', TG_OP;
+END;
+$$;
 
+DROP RULE IF EXISTS sig_events_no_update ON sig_events;
+DROP RULE IF EXISTS sig_events_no_delete ON sig_events;
+
+DROP TRIGGER IF EXISTS sig_events_reject_mutation ON sig_events;
+CREATE TRIGGER sig_events_reject_mutation
+BEFORE UPDATE OR DELETE ON sig_events
+FOR EACH ROW
+EXECUTE FUNCTION reject_sig_events_mutation();
 -- ---------------------------------------------------------------------------
 -- Row Level Security (RLS)
 -- ---------------------------------------------------------------------------

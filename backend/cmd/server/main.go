@@ -23,12 +23,20 @@ import (
 
 	"github.com/devwrightlabs/plu-lumina/backend/internal/handlers"
 	"github.com/devwrightlabs/plu-lumina/backend/internal/middleware"
+	"github.com/devwrightlabs/plu-lumina/backend/pkg/piclient"
 )
 
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
+	}
+
+	// Initialise the Pi Network API client.  This reads PI_API_KEY from the
+	// environment and fails fast if it is absent, preventing the server from
+	// accepting requests it cannot service.
+	if err := handlers.InitPiClient(piclient.Config{}); err != nil {
+		log.Fatalf("failed to initialise Pi API client: %v", err)
 	}
 
 	r := mux.NewRouter()

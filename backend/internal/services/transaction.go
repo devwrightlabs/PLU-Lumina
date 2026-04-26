@@ -207,7 +207,7 @@ func (s *TransactionService) ExecuteTransaction(txID string) (*models.MultiSigTr
 
 	// Defensive check: both signatures must be present before on-chain
 	// submission is attempted.  In theory this cannot be false if the state
-	// machine transitions were respected, but defence-in-depth warrants the
+	// machine transitions were respected, but defense-in-depth warrants the
 	// explicit check.
 	if tx.OwnerSignature == "" || tx.AgentSignature == "" {
 		tx.Status = models.TxStatusFailed

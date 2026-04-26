@@ -21,8 +21,8 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/devwrightlabs/plu-lumina/backend/handlers"
-	"github.com/devwrightlabs/plu-lumina/backend/middleware"
+	"github.com/devwrightlabs/plu-lumina/backend/internal/handlers"
+	"github.com/devwrightlabs/plu-lumina/backend/internal/middleware"
 )
 
 func main() {

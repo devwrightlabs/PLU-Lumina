@@ -50,9 +50,14 @@ A high-speed Go-based backend and Rust/Soroban smart contract system for a secur
 ```
 PLU-Lumina/
 ├── backend/              # Go REST API server
-│   ├── main.go           # Entry point & route registration
-│   ├── handlers/         # Route handler implementations
-│   ├── middleware/        # JWT auth, logging
+│   ├── cmd/
+│   │   └── server/
+│   │       └── main.go   # Entry point & route registration
+│   ├── internal/
+│   │   ├── handlers/     # Route handler implementations
+│   │   └── middleware/   # JWT auth, logging, security headers
+│   ├── api/              # OpenAPI & proto definitions (future)
+│   ├── pkg/              # Shared library code (future)
 │   └── go.mod            # Go module definition
 ├── contracts/            # Rust/Soroban smart contracts
 │   ├── src/
@@ -105,7 +110,7 @@ See [`docs/protocol23.md`](docs/protocol23.md) for the complete compliance check
 ```bash
 cd backend
 go mod tidy
-go run main.go
+go run ./cmd/server/
 ```
 
 ### Contracts

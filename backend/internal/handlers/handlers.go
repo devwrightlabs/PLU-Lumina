@@ -13,7 +13,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/devwrightlabs/plu-lumina/backend/middleware"
+	"github.com/devwrightlabs/plu-lumina/backend/internal/middleware"
 )
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -162,10 +162,10 @@ type vaultCreateRequest struct {
 
 // vaultCreateResponse is returned on successful vault provisioning.
 type vaultCreateResponse struct {
-	VaultID          string `json:"vault_id"`
-	AgentPublicKey   string `json:"agent_public_key"`
-	RequiredSigners  int    `json:"required_signers"`
-	CreatedAt        int64  `json:"created_at"`
+	VaultID         string `json:"vault_id"`
+	AgentPublicKey  string `json:"agent_public_key"`
+	RequiredSigners int    `json:"required_signers"`
+	CreatedAt       int64  `json:"created_at"`
 }
 
 // VaultCreate provisions a new Sub-Wallet multi-sig vault.
@@ -237,10 +237,10 @@ type sigValidateRequest struct {
 
 // sigValidateResponse is returned after successful 2-of-2 validation.
 type sigValidateResponse struct {
-	Valid        bool   `json:"valid"`
-	VaultID      string `json:"vault_id"`
-	TxHash       string `json:"tx_hash"`
-	ValidatedAt  int64  `json:"validated_at"`
+	Valid       bool   `json:"valid"`
+	VaultID     string `json:"vault_id"`
+	TxHash      string `json:"tx_hash"`
+	ValidatedAt int64  `json:"validated_at"`
 }
 
 // SigValidate verifies both the Owner and Lumina Agent signatures against

@@ -3,6 +3,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
@@ -14,7 +15,24 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/devwrightlabs/plu-lumina/backend/internal/middleware"
+	"github.com/devwrightlabs/plu-lumina/backend/pkg/piclient"
 )
+
+// piClient is the package-level Pi Network API client.  It is initialised once
+// at startup by InitPiClient; handler functions call it via verifyPiAccessToken.
+var piClient *piclient.Client
+
+// InitPiClient constructs the shared piclient.Client using the provided Config
+// and stores it for use by the handler functions.  Must be called once during
+// server startup before any requests are served.
+func InitPiClient(cfg piclient.Config) error {
+	c, err := piclient.New(cfg)
+	if err != nil {
+		return err
+	}
+	piClient = c
+	return nil
+}
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -68,7 +86,7 @@ func PiHandshake(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify the Pi access token with the Pi Platform API.
-	verifiedUID, err := verifyPiAccessToken(req.AccessToken)
+	verifiedUID, err := verifyPiAccessToken(r.Context(), req.AccessToken)
 	if err != nil {
 		log.Printf("pi token verification failed: %v", err)
 		writeError(w, http.StatusUnauthorized, "invalid Pi access token")
@@ -96,42 +114,20 @@ func PiHandshake(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// verifyPiAccessToken calls the Pi Platform /v2/me endpoint to validate the
-// access token and return the authenticated UID.
-func verifyPiAccessToken(accessToken string) (string, error) {
-	piAPIKey := os.Getenv("PI_API_KEY")
-	if piAPIKey == "" {
-		return "", errorf("PI_API_KEY environment variable not set")
+// verifyPiAccessToken delegates to the shared piclient.Client to validate
+// the access token against the Pi Platform /v2/me endpoint.
+// ctx is propagated so that request cancellation aborts the upstream call.
+// The client handles retries, timeouts, and credential management; this wrapper
+// keeps the handler logic free of HTTP machinery.
+func verifyPiAccessToken(ctx context.Context, accessToken string) (string, error) {
+	if piClient == nil {
+		return "", errorf("pi client not initialised; call handlers.InitPiClient at startup")
 	}
-
-	req, err := http.NewRequest(http.MethodGet, "https://api.minepi.com/v2/me", nil)
+	me, err := piClient.VerifyAccessToken(ctx, accessToken)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("X-Pi-Api-Key", piAPIKey)
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", errorf("pi platform returned status %d", resp.StatusCode)
-	}
-
-	var body struct {
-		UID string `json:"uid"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return "", err
-	}
-	if body.UID == "" {
-		return "", errorf("empty uid in pi platform response")
-	}
-	return body.UID, nil
+	return me.UID, nil
 }
 
 // issueLuminaJWT creates a signed JWT for the given UID valid until expiresAt.

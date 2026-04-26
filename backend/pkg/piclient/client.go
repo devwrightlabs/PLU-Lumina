@@ -129,8 +129,10 @@ func New(cfg Config) (*Client, error) {
 		baseURL: baseURL,
 		apiKey:  apiKey,
 		// A dedicated http.Client per piclient instance ensures that connection
-		// pooling is isolated from other subsystems and that the timeout setting
-		// is unconditionally applied.
+		// pooling is isolated from other subsystems.  Setting Timeout here
+		// provides a hard backstop for callers that pass a context without a
+		// deadline; every call in this package also uses NewRequestWithContext,
+		// so context cancellation takes effect first in the normal case.
 		httpClient: &http.Client{
 			Timeout: reqTimeout,
 			// Use the default transport (with connection pooling) but enforce
@@ -250,6 +252,10 @@ func isRetryable(status int) bool {
 // number (1-based) with full jitter to spread retry load across instances.
 //
 //	delay = min(RetryMaxDelay, RetryBaseDelay * 2^(attempt-1)) * random[0,1)
+//
+// math/rand top-level functions are automatically seeded in Go 1.20+ (this
+// module requires go 1.22) so no explicit seeding is needed.  The global source
+// is safe for concurrent use without additional locking.
 func (c *Client) backoffDelay(attempt int) time.Duration {
 	// Cap the exponent to avoid overflow on large attempt counts.
 	exp := attempt - 1
@@ -265,14 +271,30 @@ func (c *Client) backoffDelay(attempt int) time.Duration {
 	return jitter
 }
 
-// sanitizeNetworkError strips any URL or header content from network-level
-// errors before they propagate, preventing accidental credential leakage in
-// log output.  The wrapped error type is preserved for errors.Is / errors.As.
+// sanitizeNetworkError returns a sanitized error for network-level failures,
+// preventing accidental leakage of request metadata (URLs, headers) into logs.
+//
+// Context errors (cancellation and deadline exceeded) are returned verbatim
+// because they carry no sensitive data and are semantically important for
+// callers that use errors.Is.  All other errors are replaced with a generic
+// message; the original error is preserved as the Unwrap target so that
+// errors.As can still match types like *net.OpError for callers that need it.
 func sanitizeNetworkError(err error) error {
 	if err == nil {
 		return nil
 	}
-	// Return a generic description; callers receive actionable context (e.g.,
-	// "connection refused") without any request metadata.
-	return fmt.Errorf("network error communicating with pi platform")
+	// Propagate context sentinel errors unchanged; they contain no credentials.
+	if err == context.DeadlineExceeded || err == context.Canceled {
+		return err
+	}
+	// Wrap the original without exposing its message, which may contain the
+	// request URL or other metadata.
+	return &sanitizedErr{cause: err}
 }
+
+// sanitizedErr wraps a network error with a generic message while preserving
+// the underlying error for errors.Is / errors.As traversal.
+type sanitizedErr struct{ cause error }
+
+func (e *sanitizedErr) Error() string { return "network error communicating with pi platform" }
+func (e *sanitizedErr) Unwrap() error { return e.cause }

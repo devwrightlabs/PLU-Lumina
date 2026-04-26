@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -22,16 +23,24 @@ import (
 // at startup by InitPiClient; handler functions call it via verifyPiAccessToken.
 var piClient *piclient.Client
 
+// piClientOnce ensures InitPiClient's write is visible to all goroutines that
+// subsequently read piClient, preventing data races under the Go memory model.
+var piClientOnce sync.Once
+
 // InitPiClient constructs the shared piclient.Client using the provided Config
 // and stores it for use by the handler functions.  Must be called once during
-// server startup before any requests are served.
+// server startup before any requests are served.  Subsequent calls are no-ops.
 func InitPiClient(cfg piclient.Config) error {
-	c, err := piclient.New(cfg)
-	if err != nil {
-		return err
-	}
-	piClient = c
-	return nil
+	var initErr error
+	piClientOnce.Do(func() {
+		c, err := piclient.New(cfg)
+		if err != nil {
+			initErr = err
+			return
+		}
+		piClient = c
+	})
+	return initErr
 }
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────

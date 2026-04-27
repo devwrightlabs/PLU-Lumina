@@ -39,6 +39,10 @@ func main() {
 		log.Fatalf("failed to initialise Pi API client: %v", err)
 	}
 
+	// Initialise the multi-sig transaction service.  The in-memory store is
+	// ready for request serving as soon as this call returns.
+	handlers.InitTransactionService()
+
 	r := mux.NewRouter()
 
 	// Global middleware applied to every request.
@@ -71,6 +75,42 @@ func main() {
 	//   the signed XDR to the Soroban contract for on-chain execution.
 	protected.Handle("/sig/validate",
 		http.HandlerFunc(handlers.SigValidate),
+	).Methods(http.MethodPost)
+
+	// ─── Phase 5: Multi-Sig Transaction Orchestration routes ──────────────────
+	// POST /tx/initiate
+	//   Initiates a new 2-of-2 multi-sig transaction and returns it in the
+	//   pending_owner_sig state.
+	protected.Handle("/tx/initiate",
+		http.HandlerFunc(handlers.TxInitiate),
+	).Methods(http.MethodPost)
+
+	// GET /tx/{txID}
+	//   Returns the current lifecycle state of a multi-sig transaction.
+	protected.Handle("/tx/{txID}",
+		http.HandlerFunc(handlers.TxGetStatus),
+	).Methods(http.MethodGet)
+
+	// POST /tx/{txID}/sign
+	//   Records the vault owner's Ed25519 signature and advances the transaction
+	//   to pending_agent_sig.
+	protected.Handle("/tx/{txID}/sign",
+		http.HandlerFunc(handlers.TxOwnerSign),
+	).Methods(http.MethodPost)
+
+	// POST /tx/{txID}/agent-sign
+	//   Records the Lumina Agent's Ed25519 counter-signature and advances the
+	//   transaction to ready_to_execute.
+	protected.Handle("/tx/{txID}/agent-sign",
+		http.HandlerFunc(handlers.TxAgentSign),
+	).Methods(http.MethodPost)
+
+	// POST /tx/{txID}/execute
+	//   Finalises the transaction by verifying both signatures are present and
+	//   advancing the state to executed.  On-chain Soroban submission is wired
+	//   in Phase 6.
+	protected.Handle("/tx/{txID}/execute",
+		http.HandlerFunc(handlers.TxExecute),
 	).Methods(http.MethodPost)
 
 	srv := &http.Server{

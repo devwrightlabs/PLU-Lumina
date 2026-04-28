@@ -4,6 +4,7 @@ backend/*.exe
 
 # Rust / Cargo build artifacts
 contracts/target/
+contracts/yield-protocol/target/
 
 # Go module download cache (only commit go.sum, not the cache)
 # go.sum is intentionally committed

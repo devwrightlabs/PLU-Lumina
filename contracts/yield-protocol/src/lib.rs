@@ -393,9 +393,10 @@ fn assert_vault_executed(
         panic!("vault: token mismatch");
     }
 
-    // Verify the released amount covers the requested amount.
-    if proposal.amount < expected_amount {
-        panic!("vault: released amount is less than requested amount");
+    // Verify the released amount exactly matches the requested amount so
+    // no excess tokens can be transferred and left unaccounted in-contract.
+    if proposal.amount != expected_amount {
+        panic!("vault: released amount does not match requested amount");
     }
 }
 

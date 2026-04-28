@@ -107,11 +107,20 @@ pub enum DataKey {
     /// Reentrancy guard; set to `true` while a state-mutating call is active.
     ReentryLock,
     /// Marks a vault proposal TX ID as already consumed to prevent replay.
-    VaultTxUsed(BytesN<32>),
+    /// Keyed by both vault contract and vault-local TX ID to avoid collisions
+    /// across different vaults reusing the same user-supplied `tx_id`.
+    VaultTxUsed(VaultTxUsedKey),
 }
 
 // ─── Composite keys ───────────────────────────────────────────────────────────
 
+/// Composite storage key for a consumed vault transaction.
+#[contracttype]
+#[derive(Clone)]
+pub struct VaultTxUsedKey {
+    pub vault: Address,
+    pub tx_id: BytesN<32>,
+}
 /// Composite storage key for a user's liquidity position.
 #[contracttype]
 #[derive(Clone)]

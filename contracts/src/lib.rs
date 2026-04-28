@@ -337,6 +337,8 @@ impl MultiSigVault {
 
 #[cfg(test)]
 mod tests {
+    extern crate alloc;
+
     use super::*;
     use soroban_sdk::{
         testutils::{Address as _},
@@ -347,7 +349,7 @@ mod tests {
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     fn setup() -> (&'static Env, Address, Address, Address, MultiSigVaultClient<'static>) {
-        let env: &'static Env = std::boxed::Box::leak(std::boxed::Box::new(Env::default()));
+        let env: &'static Env = alloc::boxed::Box::leak(alloc::boxed::Box::new(Env::default()));
         let contract_id       = env.register_contract(None, MultiSigVault);
         let client            = MultiSigVaultClient::new(env, &contract_id.clone());
 

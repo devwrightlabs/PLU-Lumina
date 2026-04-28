@@ -25,6 +25,7 @@ import (
 	"github.com/devwrightlabs/plu-lumina/backend/internal/middleware"
 	"github.com/devwrightlabs/plu-lumina/backend/internal/repository"
 	"github.com/devwrightlabs/plu-lumina/backend/internal/services"
+	"github.com/devwrightlabs/plu-lumina/backend/internal/workers"
 	"github.com/devwrightlabs/plu-lumina/backend/pkg/piclient"
 )
 
@@ -67,6 +68,36 @@ func main() {
 	// Wire the AI signer into the handler layer so the agent-sign endpoint
 	// can trigger risk assessment and signature generation via the repository.
 	handlers.InitAISigner(aiSigner)
+
+	// ─── Phase 7: AMM Service & Blockchain Event Listener ─────────────────────
+	// Both components are optional: they are only initialised when
+	// STELLAR_HORIZON_URL is present in the environment, so existing
+	// deployments that have not yet provisioned Stellar infrastructure are not
+	// broken.  When the variable IS set all three Phase 7 env vars are required
+	// and a missing value produces a fast-fail at startup.
+	if os.Getenv(services.EnvHorizonURL) != "" {
+		ammSvc, err := services.NewAMMService(txRepo)
+		if err != nil {
+			log.Fatalf("failed to initialise AMM service: %v", err)
+		}
+		handlers.InitAMMService(ammSvc)
+		log.Printf("[main] AMM service initialised (contract=%s)", os.Getenv(services.EnvAMMContractAddress))
+
+		chainListener, err := workers.NewChainListenerFromEnv(txRepo)
+		if err != nil {
+			log.Fatalf("failed to initialise blockchain event listener: %v", err)
+		}
+
+		// The listener goroutine is cancelled via listenerCancel which is
+		// deferred below alongside the HTTP server shutdown so that in-flight
+		// reconciliation cycles complete cleanly before the process exits.
+		listenerCtx, listenerCancel := context.WithCancel(context.Background())
+		defer listenerCancel()
+		go chainListener.Run(listenerCtx)
+		log.Println("[main] blockchain event listener started")
+	} else {
+		log.Println("[main] STELLAR_HORIZON_URL not set; Phase 7 (AMM/chain-listener) skipped")
+	}
 
 	r := mux.NewRouter()
 

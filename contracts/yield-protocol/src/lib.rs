@@ -642,6 +642,17 @@ impl YieldProtocol {
         let proposal = fetch_vault_proposal(&env, &vault_contract, &vault_tx_id);
         assert_vault_executed(&env, &proposal, &pool.token, amount);
 
+        // Bind the consumed vault transaction to the authenticated caller.
+        // Without this check, any observer could front-run with the same
+        // vault_tx_id and credit the deposit to their own pool position.
+        let vault_owner: Address = env.invoke_contract(
+            &vault_contract,
+            &Symbol::new(&env, "get_owner"),
+            SorobanVec::new(&env),
+        );
+        if vault_owner != caller {
+            panic!("caller is not the owner of the vault");
+        }
         // Mark the vault tx_id as consumed so it cannot be replayed.
         env.storage().persistent().set(&used_key, &true);
 

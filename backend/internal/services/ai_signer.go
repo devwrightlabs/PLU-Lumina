@@ -17,10 +17,10 @@ import (
 
 // ─── Policy constants ─────────────────────────────────────────────────────────
 
-// maxApprovedAmountXLM is the upper bound (in stroops, 1 XLM = 10_000_000
+// maxApprovedAmountXLM is the upper bound (in stroops, 1 XLM = 10,000,000
 // stroops) the AI validator will auto-approve without escalation.
 // Transactions above this limit are rejected by the mock risk engine.
-const maxApprovedAmountXLM = 10_000 * 10_000_000 // 10 000 XLM in stroops
+const maxApprovedAmountXLM = 10_000 * 10_000_000 // 10,000 XLM in stroops
 
 // ─── AISigner ────────────────────────────────────────────────────────────────
 

@@ -23,6 +23,8 @@ import (
 
 	"github.com/devwrightlabs/plu-lumina/backend/internal/handlers"
 	"github.com/devwrightlabs/plu-lumina/backend/internal/middleware"
+	"github.com/devwrightlabs/plu-lumina/backend/internal/repository"
+	"github.com/devwrightlabs/plu-lumina/backend/internal/services"
 	"github.com/devwrightlabs/plu-lumina/backend/pkg/piclient"
 )
 
@@ -39,9 +41,32 @@ func main() {
 		log.Fatalf("failed to initialise Pi API client: %v", err)
 	}
 
+	// ─── Phase 6: Database connection ─────────────────────────────────────────
+	// Open the Supabase/PostgreSQL connection pool.  A 10-second timeout is
+	// applied so the server fails fast on misconfigured DATABASE_URL rather
+	// than hanging indefinitely.
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer dbCancel()
+
+	txRepo, err := repository.NewPgxTransactionRepo(dbCtx)
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
+	}
+	defer txRepo.Close()
+
+	// ─── Phase 6: AI Co-Signer initialisation ────────────────────────────────
+	aiSigner, err := services.NewAISigner(txRepo)
+	if err != nil {
+		log.Fatalf("failed to initialise AI co-signer: %v", err)
+	}
+
 	// Initialise the multi-sig transaction service.  The in-memory store is
 	// ready for request serving as soon as this call returns.
 	handlers.InitTransactionService()
+
+	// Wire the AI signer into the handler layer so the agent-sign endpoint
+	// can trigger risk assessment and signature generation via the repository.
+	handlers.InitAISigner(aiSigner)
 
 	r := mux.NewRouter()
 

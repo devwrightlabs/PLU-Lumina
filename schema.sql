@@ -195,13 +195,54 @@ BEFORE UPDATE OR DELETE ON sig_events
 FOR EACH ROW
 EXECUTE FUNCTION reject_sig_events_mutation();
 -- ---------------------------------------------------------------------------
+-- Table: multisig_transactions
+-- Mutable lifecycle record for each 2-of-2 multi-sig transaction.
+-- One row per transaction; status and signature columns are updated as the
+-- transaction advances through its state machine.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS multisig_transactions (
+    id              TEXT          PRIMARY KEY,                   -- double-SHA-256 hex digest
+    vault_id        TEXT          NOT NULL,                      -- logical vault ID (hex digest)
+    owner_uid       TEXT          NOT NULL,                      -- Pi Network UID
+    tx_envelope_xdr TEXT          NOT NULL,                      -- base64 Stellar XDR envelope
+    recipient       TEXT          NOT NULL,                      -- destination Stellar address
+    amount          NUMERIC(38,7) NOT NULL,                      -- release amount (7 dp precision)
+    status          TEXT          NOT NULL,                      -- TxStatus lifecycle state
+    owner_signature TEXT          NOT NULL DEFAULT '',           -- hex-encoded Ed25519 owner sig
+    agent_signature TEXT          NOT NULL DEFAULT '',           -- hex-encoded Ed25519 agent sig
+    tx_hash         TEXT          NOT NULL DEFAULT '',           -- Stellar transaction hash
+    failure_reason  TEXT          NOT NULL DEFAULT '',           -- populated on failure
+    initiated_at    TIMESTAMPTZ   NOT NULL,
+    updated_at      TIMESTAMPTZ   NOT NULL
+);
+
+COMMENT ON TABLE  multisig_transactions               IS '2-of-2 multi-sig transaction lifecycle records for Lumina-Core.';
+COMMENT ON COLUMN multisig_transactions.vault_id      IS 'Logical vault identifier; references vaults.vault_id (not FK to avoid schema coupling at bootstrap).';
+COMMENT ON COLUMN multisig_transactions.status        IS 'One of: pending_owner_sig, pending_agent_sig, ready_to_execute, executed, failed, cancelled.';
+COMMENT ON COLUMN multisig_transactions.owner_signature IS 'Hex-encoded Ed25519 signature produced by the vault owner.';
+COMMENT ON COLUMN multisig_transactions.agent_signature IS 'Hex-encoded Ed25519 counter-signature produced by the Lumina Agent.';
+
+CREATE INDEX idx_multisig_tx_status     ON multisig_transactions (status);
+CREATE INDEX idx_multisig_tx_vault_id   ON multisig_transactions (vault_id);
+CREATE INDEX idx_multisig_tx_owner_uid  ON multisig_transactions (owner_uid);
+CREATE INDEX idx_multisig_tx_initiated  ON multisig_transactions (initiated_at DESC);
+
+-- Auto-update updated_at on every mutation (re-uses the set_updated_at function
+-- defined above for the vaults table).
+CREATE TRIGGER multisig_transactions_updated_at
+BEFORE UPDATE ON multisig_transactions
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ---------------------------------------------------------------------------
 -- Row Level Security (RLS)
 -- ---------------------------------------------------------------------------
-ALTER TABLE users             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE handshake_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE vaults            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE vault_balances    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sig_events        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users                   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE handshake_history       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vaults                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vault_balances          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sig_events              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE multisig_transactions   ENABLE ROW LEVEL SECURITY;
 
 -- Service role (backend) has full access; anon/authenticated roles are blocked
 -- by default until explicit policies are added per-endpoint requirement.
@@ -224,4 +265,8 @@ CREATE POLICY vault_balances_service_all ON vault_balances
 
 -- sig_events: service role full access (append-only enforced by rules above)
 CREATE POLICY sig_events_service_all ON sig_events
+    USING (auth.role() = 'service_role');
+
+-- multisig_transactions: backend service role only
+CREATE POLICY multisig_tx_service_all ON multisig_transactions
     USING (auth.role() = 'service_role');

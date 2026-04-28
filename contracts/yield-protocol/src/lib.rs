@@ -339,6 +339,9 @@ fn get_fresh_oracle_price(env: &Env, oracle: &Address, token: &Address) -> Price
         env.invoke_contract(oracle, &Symbol::new(env, "lastprice"), args);
 
     let now = env.ledger().timestamp();
+    if data.timestamp > now {
+        panic!("oracle: price timestamp is in the future");
+    }
     if now.saturating_sub(data.timestamp) > MAX_ORACLE_AGE_SECS {
         panic!("oracle: price is stale");
     }

@@ -12,6 +12,7 @@
  */
 
 import { UniversalDepositComponent } from "@/components/UniversalDepositComponent";
+import { MultiSigTracker } from "@/components/MultiSigTracker";
 
 export default function DashboardPage() {
   return (
@@ -54,15 +55,16 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Multi-Sig transaction tracker placeholder */}
+          {/* Multi-Sig transaction tracker — live via Zustand */}
           <div className="rounded-2xl border border-[#F0C040]/20 bg-[#0F0F1A] p-6 shadow-lg shadow-black/40">
             <h2 className="mb-4 text-lg font-semibold tracking-widest text-[#F0C040] uppercase">
               Multi-Sig Transactions
             </h2>
-            <p className="text-sm text-white/30">
-              No in-flight transactions. Transaction history will appear here
-              once the 2-of-2 signing flow is activated in Phase 12.
-            </p>
+            {/*
+             * MultiSigTracker is a client component that subscribes to the
+             * Zustand multiSigTxs slice and renders live signing pipeline status.
+             */}
+            <MultiSigTracker />
           </div>
         </div>
 
@@ -84,18 +86,31 @@ export default function DashboardPage() {
         </p>
         <div className="flex flex-wrap gap-4">
           {[
-            { chain: "Pi Network", status: "pending" },
+            { chain: "Pi Network", status: "active" },
             { chain: "Bitcoin Bridge", status: "pending" },
             { chain: "Ethereum Bridge", status: "pending" },
             { chain: "Soroban RPC", status: "pending" },
           ].map(({ chain, status }) => (
             <div key={chain} className="flex items-center gap-2">
-              {/* Status indicator — will be animated in Phase 12 */}
-              <span className="h-2 w-2 rounded-full bg-white/20" />
+              {/* Status indicator */}
+              <span
+                className={[
+                  "h-2 w-2 rounded-full",
+                  status === "active"
+                    ? "bg-green-400 animate-pulse"
+                    : "bg-white/20",
+                ].join(" ")}
+              />
               <span className="text-xs text-white/40">
                 {chain}{" "}
                 <span className="text-white/20">·</span>{" "}
-                <span className="text-white/20 capitalize">{status}</span>
+                <span
+                  className={
+                    status === "active" ? "text-green-400/70" : "text-white/20"
+                  }
+                >
+                  {status}
+                </span>
               </span>
             </div>
           ))}

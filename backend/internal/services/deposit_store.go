@@ -108,7 +108,9 @@ func deriveDepositID(ownerUID, vaultID string, chain models.ChainID, asset model
 	h.Write([]byte(fmt.Sprintf("%d", ts.UnixNano())))
 	// Mix in random bytes so two requests at the same nanosecond diverge.
 	var nonce [8]byte
-	_, _ = rand.Read(nonce[:])
+	if _, err := rand.Read(nonce[:]); err != nil {
+		log.Panicf("failed to generate deposit ID nonce: %v", err)
+	}
 	h.Write(nonce[:])
 	first := h.Sum(nil)
 

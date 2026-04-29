@@ -57,9 +57,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      # Always use the cached layer unless source files changed.
+      # Reuse layers from the previously published image using Compose-compatible syntax.
       cache_from:
-        - type=registry,ref=ghcr.io/devwrightlabs/plu-lumina-api:cache
+        - ghcr.io/devwrightlabs/plu-lumina-api:${IMAGE_TAG:-latest}
     image: ghcr.io/devwrightlabs/plu-lumina-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:

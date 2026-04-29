@@ -126,7 +126,19 @@ func (m *OmnichainMinter) MintWrapped(ctx context.Context, depositID string) err
 
 	txHash, err := m.submitToHorizon(ctx, envelope)
 	if err != nil {
-		return m.failDeposit(deposit, "horizon submission: "+err.Error())
+		// Horizon submission can fail transiently (for example due to network
+		// or upstream availability issues). Revert back to confirmed so the
+		// listener can retry on the next cycle instead of terminally failing
+		// an otherwise valid deposit.
+		deposit.Status = models.DepositStatusConfirmed
+		deposit.UpdatedAt = time.Now().UTC()
+		if updateErr := m.store.Update(deposit); updateErr != nil {
+			return fmt.Errorf(
+				"reverting deposit %s to confirmed after horizon submission failure (%v): %w",
+				depositID, err, updateErr,
+			)
+		}
+		return fmt.Errorf("horizon submission for deposit %s: %w", depositID, err)
 	}
 
 	deposit.SorobanTxHash = txHash

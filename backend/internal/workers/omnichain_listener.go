@@ -316,9 +316,16 @@ func (l *OmnichainListener) reconcileDeposit(
 		// reached to guard against chain re-organisations.
 		return l.checkConfirmations(ctx, deposit, currentBlock)
 
+	case models.DepositStatusConfirmed:
+		// The deposit has enough source-chain confirmations but mint submission
+		// may have previously failed before the stored state advanced to
+		// "minting". Retry the mint path so transient persistence/submission
+		// failures do not leave confirmed deposits stuck indefinitely.
+		return l.MintWrapped(ctx, deposit)
+
 	default:
-		// All other states (confirmed, minting, minted, failed, expired) are
-		// terminal or handled elsewhere; nothing to do here.
+		// All other states (minting, minted, failed, expired) are terminal or
+		// handled elsewhere; nothing to do here.
 		return nil
 	}
 }

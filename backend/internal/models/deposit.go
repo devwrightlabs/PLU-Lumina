@@ -36,9 +36,11 @@ const (
 // that will be minted inside the user's Lumina Multi-Sig Vault on Pi Network.
 // Trustless equivalence: 1 deposited unit ↔ 1 minted wrapped unit.
 var WrappedAsset = map[AssetSymbol]string{
-	AssetETH:  "piETH",
-	AssetBTC:  "piBTC",
-	AssetUSDT: "piUSDT",
+	AssetETH:   "piETH",
+	AssetBTC:   "piBTC",
+	AssetUSDT:  "piUSDT",
+	AssetBNB:   "piBNB",
+	AssetMATIC: "piMATIC",
 }
 
 // ─── Deposit lifecycle ────────────────────────────────────────────────────────

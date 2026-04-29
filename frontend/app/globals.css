@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/*
+ * Lumina Design System — global tokens.
+ *
+ * All Lumina-specific colour values are defined as CSS custom properties here
+ * so they can be referenced both in Tailwind utilities and in plain CSS rules.
+ *
+ * Brand palette:
+ *   --lumina-bg       #0A0A0F  Deep space background — conveys security & depth.
+ *   --lumina-surface  #0F0F1A  Elevated card surface — subtle contrast layer.
+ *   --lumina-gold     #F0C040  Primary accent / trust signal — gold authority.
+ *   --lumina-fg       #E8E8F0  Near-white body text — high contrast on dark bg.
+ */
+
+@theme inline {
+  --color-lumina-bg: #0A0A0F;
+  --color-lumina-surface: #0F0F1A;
+  --color-lumina-gold: #F0C040;
+  --color-lumina-fg: #E8E8F0;
+}
+
+:root {
+  --lumina-bg: #0A0A0F;
+  --lumina-surface: #0F0F1A;
+  --lumina-gold: #F0C040;
+  --lumina-fg: #E8E8F0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Force dark mode regardless of OS preference — Lumina is always dark. */
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--lumina-bg);
+  color: var(--lumina-fg);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Thin gold scrollbar for an elite, on-brand feel. */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--lumina-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--lumina-gold);
+  border-radius: 2px;
+}

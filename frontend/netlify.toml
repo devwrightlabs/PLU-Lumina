@@ -61,7 +61,7 @@
     # – connect-src: allow calls to our own API, Supabase, and the Pi Platform.
     # – img-src data:: allows base64-encoded placeholder images used by
     #   Next.js Image Optimisation.
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://sdk.minepi.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://api.minepi.com ${NEXT_PUBLIC_API_URL}; img-src 'self' data: https:; font-src 'self'; frame-ancestors 'self'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://sdk.minepi.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://api.minepi.com ${NEXT_PUBLIC_LUMINA_API_URL}; img-src 'self' data: https:; font-src 'self'; frame-ancestors 'self'"
 
     # CORS: only our production API origin is allowed to make cross-origin
     # requests to Netlify's edge layer.  Adjust the value via Netlify's

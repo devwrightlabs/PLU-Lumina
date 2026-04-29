@@ -18,6 +18,7 @@ import type {
   PiSession,
   MultiSigTransaction,
   OmnichainBalances,
+  CrossChainDepositState,
 } from "@/types/lumina";
 
 // ─── State Shape ──────────────────────────────────────────────────────────────
@@ -37,6 +38,12 @@ interface LuminaState {
   // ── Omnichain Asset Balances ───────────────────────────────────────────────
   balances: OmnichainBalances;
   setBalances: (balances: Partial<OmnichainBalances>) => void;
+
+  // ── Phase 13: Cross-Chain Deposits ────────────────────────────────────────
+  /** Active and recently completed cross-chain deposits keyed by depositId. */
+  crossChainDeposits: Record<string, CrossChainDepositState>;
+  upsertCrossChainDeposit: (deposit: CrossChainDepositState) => void;
+  removeCrossChainDeposit: (depositId: string) => void;
 }
 
 // ─── Default Values ───────────────────────────────────────────────────────────
@@ -51,6 +58,7 @@ const DEFAULT_BALANCES: OmnichainBalances = {
   pi: "0",
   piBTC: "0",
   piETH: "0",
+  piUSDT: "0",
 };
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -91,6 +99,24 @@ export const useLuminaStore = create<LuminaState>()(
         set((state) => ({
           balances: { ...state.balances, ...patch },
         })),
+
+      // ── Phase 13: Cross-Chain Deposits ────────────────────────────────────
+      crossChainDeposits: {},
+
+      upsertCrossChainDeposit: (deposit) =>
+        set((state) => ({
+          crossChainDeposits: {
+            ...state.crossChainDeposits,
+            [deposit.depositId]: deposit,
+          },
+        })),
+
+      removeCrossChainDeposit: (depositId) =>
+        set((state) => {
+          const next = { ...state.crossChainDeposits };
+          delete next[depositId];
+          return { crossChainDeposits: next };
+        }),
     }),
     {
       name: "lumina-state",
@@ -109,6 +135,7 @@ export const useLuminaStore = create<LuminaState>()(
       partialize: (state) => ({
         balances: state.balances,
         multiSigTxs: state.multiSigTxs,
+        crossChainDeposits: state.crossChainDeposits,
       }),
     }
   )

@@ -270,3 +270,72 @@ CREATE POLICY sig_events_service_all ON sig_events
 -- multisig_transactions: backend service role only
 CREATE POLICY multisig_tx_service_all ON multisig_transactions
     USING (auth.role() = 'service_role');
+
+-- =============================================================================
+-- Phase 13: Omnichain Relayer — Cross-Chain Deposit Tracking
+-- =============================================================================
+-- crosschain_deposits tracks every external-asset deposit from address
+-- generation through EVM confirmation to Soroban vault minting.
+--
+-- The in-memory DepositStore used in Go (services/deposit_store.go) is the
+-- primary runtime store for Phase 13; this table is the production-grade
+-- persistent backend that replaces it in a full deployment.
+-- =============================================================================
+
+CREATE TYPE deposit_status AS ENUM (
+    'pending',    -- Address generated; awaiting inbound EVM transfer
+    'detected',   -- Transfer seen; accumulating reorg-safe confirmations
+    'confirmed',  -- Confirmation threshold reached; safe to mint
+    'minting',    -- Soroban mint_wrapped transaction submitted
+    'minted',     -- Wrapped asset credited to the vault
+    'failed',     -- Non-retryable error; see failure_reason
+    'expired'     -- Address TTL elapsed without a deposit
+);
+
+CREATE TABLE IF NOT EXISTS crosschain_deposits (
+    id                TEXT            NOT NULL,
+    vault_id          TEXT            NOT NULL,
+    owner_uid         TEXT            NOT NULL,
+    chain             TEXT            NOT NULL,  -- e.g. 'ETH', 'BSC', 'MATIC'
+    asset             TEXT            NOT NULL,  -- e.g. 'USDT', 'ETH', 'BTC'
+    deposit_address   TEXT            NOT NULL,
+    contract_address  TEXT            NOT NULL DEFAULT '',
+    expected_amount   TEXT            NOT NULL DEFAULT '',
+    actual_amount     TEXT            NOT NULL DEFAULT '',
+    external_tx_hash  TEXT            NOT NULL DEFAULT '',
+    detected_block    BIGINT          NOT NULL DEFAULT 0,
+    confirmations     INTEGER         NOT NULL DEFAULT 0,
+    status            deposit_status  NOT NULL DEFAULT 'pending',
+    soroban_tx_hash   TEXT            NOT NULL DEFAULT '',
+    failure_reason    TEXT            NOT NULL DEFAULT '',
+    expires_at        TIMESTAMPTZ     NOT NULL,
+    created_at        TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT crosschain_deposits_pkey PRIMARY KEY (id)
+);
+
+DROP TRIGGER IF EXISTS trg_crosschain_deposits_set_updated_at ON crosschain_deposits;
+CREATE TRIGGER trg_crosschain_deposits_set_updated_at
+    BEFORE UPDATE ON crosschain_deposits
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+-- Index on status for fast listener queries (pending + detected).
+CREATE INDEX IF NOT EXISTS idx_crosschain_deposits_status
+    ON crosschain_deposits (status)
+    WHERE status IN ('pending', 'detected');
+
+-- Index on vault_id for user-facing deposit history queries.
+CREATE INDEX IF NOT EXISTS idx_crosschain_deposits_vault
+    ON crosschain_deposits (vault_id);
+
+-- Index on deposit_address for O(1) lookups during listener reconciliation.
+CREATE INDEX IF NOT EXISTS idx_crosschain_deposits_address
+    ON crosschain_deposits (deposit_address);
+
+-- Row-Level Security.
+ALTER TABLE crosschain_deposits ENABLE ROW LEVEL SECURITY;
+
+-- crosschain_deposits: backend service role only.
+CREATE POLICY crosschain_deposits_service_all ON crosschain_deposits
+    USING (auth.role() = 'service_role');

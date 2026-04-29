@@ -58,4 +58,79 @@ export interface OmnichainBalances {
   piBTC: string;
   /** Stellar-wrapped Ethereum handled by the Lumina bridge. */
   piETH: string;
+  /** Stellar-wrapped USDT handled by the Lumina bridge. */
+  piUSDT: string;
+}
+
+// ─── Phase 13: Cross-Chain Deposit Types ──────────────────────────────────────
+
+/** Supported external EVM-compatible chains for omnichain deposits. */
+export type CrossChainID = "ETH" | "BSC" | "MATIC";
+
+/** Supported external assets that can be bridged into the Lumina vault. */
+export type CrossChainAsset = "ETH" | "BTC" | "USDT";
+
+/**
+ * Lifecycle states of a cross-chain deposit, mirroring the Go backend's
+ * DepositStatus type.  The omnichain listener advances deposits through
+ * these states automatically.
+ */
+export type CrossChainDepositStatus =
+  | "pending"    // Address generated; awaiting inbound transfer
+  | "detected"   // Transfer seen on external chain; accumulating confirmations
+  | "confirmed"  // Reorg-safe confirmation depth reached
+  | "minting"    // Soroban mint_wrapped transaction submitted to Pi Network
+  | "minted"     // Wrapped asset credited to the user's vault
+  | "failed"     // Non-retryable error; see failureReason
+  | "expired";   // Address TTL elapsed without a deposit
+
+/** Response returned by POST /deposit/address. */
+export interface DepositAddressResponse {
+  depositId: string;
+  depositAddress: string;
+  chain: CrossChainID;
+  asset: CrossChainAsset;
+  wrappedAsset: string;
+  /** Unix timestamp (seconds) after which the address is decommissioned. */
+  expiresAt: number;
+  status: CrossChainDepositStatus;
+  /**
+   * The reorg-safe confirmation depth configured on the backend listener.
+   * Derived from EVM_MIN_CONFIRMATIONS (default 12).  Display this value in
+   * the UI instead of a hardcoded constant.
+   */
+  minConfirmations: number;
+}
+
+/** Response returned by GET /deposit/:id/status. */
+export interface DepositStatusResponse {
+  depositId: string;
+  status: CrossChainDepositStatus;
+  chain: CrossChainID;
+  asset: CrossChainAsset;
+  depositAddress: string;
+  actualAmount?: string;
+  confirmations?: number;
+  externalTxHash?: string;
+  sorobanTxHash?: string;
+  failureReason?: string;
+  updatedAt: number;
+}
+
+/** In-flight cross-chain deposit tracked in the Zustand store. */
+export interface CrossChainDepositState {
+  depositId: string;
+  chain: CrossChainID;
+  asset: CrossChainAsset;
+  depositAddress: string;
+  wrappedAsset: string;
+  status: CrossChainDepositStatus;
+  /** How many external-chain confirmations have been observed so far. */
+  confirmations: number;
+  /** The reorg-safe confirmation depth required by the backend listener. */
+  minConfirmations: number;
+  externalTxHash: string | null;
+  sorobanTxHash: string | null;
+  failureReason: string | null;
+  updatedAt: string;
 }

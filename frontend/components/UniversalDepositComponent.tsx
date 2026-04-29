@@ -205,8 +205,16 @@ export function UniversalDepositComponent() {
         // The backend derives it from OMNICHAIN_DEPOSIT_SEED + depositID so
         // the frontend has zero influence over the address derivation —
         // maintaining trustless execution guarantees.
+        const provisionedVaultId = useLuminaStore.getState().vaultId;
+
+        if (!provisionedVaultId) {
+          throw new Error(
+            "No provisioned vault ID found — complete vault setup and try again.",
+          );
+        }
+
         const response = await requestDepositAddress({
-          vaultId: piSession.user.uid,
+          vaultId: provisionedVaultId,
           chain: config.chain as CrossChainID,
           asset: config.asset as CrossChainAsset,
           expectedAmount: parsedAmount.toString(),

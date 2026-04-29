@@ -363,18 +363,28 @@ func (l *OmnichainListener) scanForDeposit(
 			if evmlog.Removed {
 				continue
 			}
+
+			decodedAmount := decodeERC20Amount(evmlog.Data)
+			amountInt, ok := new(big.Int).SetString(decodedAmount, 10)
+			if !ok || amountInt.Sign() <= 0 {
+				// Ignore malformed or zero-value Transfer events so they do not
+				// lock a one-time deposit address into the detected lifecycle.
+				continue
+			}
+
 			txHash = evmlog.TransactionHash
-			amount = decodeERC20Amount(evmlog.Data)
+			amount = decodedAmount
 			detectedBlock = hexToInt64(evmlog.BlockNumber)
-			// First non-removed Transfer event wins.  Lumina deposit addresses
-			// are one-time-use: a user should send funds only once.  If a second
-			// transfer arrives at the same address after the first is detected,
-			// it is not counted towards this mint (the deposit record is already
-			// advancing through the confirmed → minting → minted lifecycle).
-			// Those additional funds remain at the address and must be recovered
-			// by the operator's sweep service; they are not automatically minted
-			// or lost.  Operators should monitor for such cases and credit users
-			// manually or via a supplemental sweep-and-mint process.
+			// First positive, non-removed Transfer event wins. Lumina deposit
+			// addresses are one-time-use: a user should send funds only once.
+			// If a second transfer arrives at the same address after the first
+			// is detected, it is not counted towards this mint (the deposit
+			// record is already advancing through the confirmed → minting →
+			// minted lifecycle). Those additional funds remain at the address
+			// and must be recovered by the operator's sweep service; they are
+			// not automatically minted or lost. Operators should monitor for
+			// such cases and credit users manually or via a supplemental
+			// sweep-and-mint process.
 			break
 		}
 	} else {

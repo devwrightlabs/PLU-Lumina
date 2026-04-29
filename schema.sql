@@ -315,6 +315,11 @@ CREATE TABLE IF NOT EXISTS crosschain_deposits (
     CONSTRAINT crosschain_deposits_pkey PRIMARY KEY (id)
 );
 
+DROP TRIGGER IF EXISTS trg_crosschain_deposits_set_updated_at ON crosschain_deposits;
+CREATE TRIGGER trg_crosschain_deposits_set_updated_at
+    BEFORE UPDATE ON crosschain_deposits
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
 -- Index on status for fast listener queries (pending + detected).
 CREATE INDEX IF NOT EXISTS idx_crosschain_deposits_status
     ON crosschain_deposits (status)

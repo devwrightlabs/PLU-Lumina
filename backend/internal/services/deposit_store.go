@@ -164,6 +164,8 @@ func (s *DepositStore) CreateDeposit(
 	// key.  In production, replace deriveDepositAddress with go-ethereum's
 	// crypto.GenerateKey() + HD wallet derivation and ensure the sweep
 	// service indexes this key before presenting the address to users.
+	log.Printf("[deposit-store][WARN] sweep service must be operational and indexing deposit keys before presenting address to users id=%s chain=%s asset=%s addr=%s vault=%s",
+		id, chain, asset, addr, vaultID)
 	log.Printf("[deposit-store] created id=%s chain=%s asset=%s addr=%s vault=%s",
 		id, chain, asset, addr, vaultID)
 	return copyDeposit(deposit), nil

@@ -68,15 +68,6 @@
     # environment variable panel — never hardcode production domains here.
     Access-Control-Allow-Origin = "${CORS_ALLOWED_ORIGIN}"
 
-# ── SPA / App Router fallback redirect ────────────────────────────────────────
-# Route all unmatched paths back to Next.js so that client-side navigation
-# works correctly.  The Next.js plugin handles this automatically; this rule
-# is a belt-and-suspenders guard.
-[[redirects]]
-  from   = "/*"
-  to     = "/index.html"
-  status = 200
-
 # ── Environment contexts ───────────────────────────────────────────────────────
 # Netlify merges context-specific env vars on top of the base [build.environment]
 # block.  Secrets (Supabase keys, API URLs) are injected through the Netlify

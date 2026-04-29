@@ -149,6 +149,16 @@ func DepositStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	uid, ok := r.Context().Value(middleware.ContextKeyUID).(string)
+	if !ok || uid == "" {
+		writeError(w, http.StatusForbidden, "forbidden")
+		return
+	}
+
+	if deposit.OwnerUID != uid {
+		writeError(w, http.StatusForbidden, "forbidden")
+		return
+	}
 	writeJSON(w, http.StatusOK, models.DepositStatusResponse{
 		DepositID:      deposit.ID,
 		Status:         deposit.Status,

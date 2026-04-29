@@ -10,7 +10,7 @@
 /** Status of the Pi SDK injection and wallet handshake. */
 export type PiConnectionStatus =
   | "idle"        // No connection attempted yet
-  | "connecting"  // Pi SDK initialising / Pi Browser handshake in progress
+  | "connecting"  // Pi SDK initializing / Pi Browser handshake in progress
   | "connected"   // Active, authenticated Pi session
   | "error";      // Auth failed or SDK not available
 

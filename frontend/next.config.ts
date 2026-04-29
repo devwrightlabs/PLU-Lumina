@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)",
+        source: "/:path*",
         headers: [
           // Prevent the Pi Browser's WebView from rendering Lumina inside an
           // iframe on a different origin (clickjacking protection).
@@ -43,4 +43,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-

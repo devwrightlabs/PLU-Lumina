@@ -238,11 +238,10 @@ func (l *OmnichainListener) Run(ctx context.Context) {
 			return
 
 		case <-ticker.C:
-			// Each cycle runs under its own bounded context so a slow RPC
-			// call cannot hold the ticker goroutine past the next interval.
-			cycleCtx, cycleCancel := context.WithTimeout(ctx, l.pollInterval)
-			err := l.reconcile(cycleCtx)
-			cycleCancel()
+			// Reconciliation inherits the listener lifecycle context. Individual
+			// operations inside reconcile should apply their own timeouts so
+			// shorter EVM request deadlines do not cancel longer-lived minting.
+			err := l.reconcile(ctx)
 
 			if err != nil {
 				currentBackoff = omnichainNextBackoff(currentBackoff)

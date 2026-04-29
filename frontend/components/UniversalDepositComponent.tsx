@@ -131,7 +131,10 @@ export function UniversalDepositComponent() {
   // ── Cross-chain status polling ─────────────────────────────────────────────
 
   const startPolling = useCallback(
-    (depositId: string) => {
+    // minConfirmations is passed in at call-time (captured from the initial
+    // DepositAddressResponse) so the interval callback never closes over
+    // activeDeposit, eliminating the stale-closure risk.
+    (depositId: string, minConfirmations: number) => {
       if (!isConnected || !piSession.luminaJwt) return;
       const jwt = piSession.luminaJwt;
 
@@ -149,9 +152,9 @@ export function UniversalDepositComponent() {
             wrappedAsset: assetToWrapped(status.asset),
             status: status.status,
             confirmations: status.confirmations ?? 0,
-            // Preserve minConfirmations from the initial DepositAddressResponse;
-            // the status poll endpoint does not repeat this configuration value.
-            minConfirmations: activeDeposit?.minConfirmations ?? 12,
+            // minConfirmations is captured from the argument (not from a
+            // potentially-stale activeDeposit closure).
+            minConfirmations,
             externalTxHash: status.externalTxHash ?? null,
             sorobanTxHash: status.sorobanTxHash ?? null,
             failureReason: status.failureReason ?? null,
@@ -231,7 +234,7 @@ export function UniversalDepositComponent() {
         upsertCrossChainDeposit(depositState);
 
         // Begin polling for on-chain confirmation and Soroban minting.
-        startPolling(response.depositId);
+        startPolling(response.depositId, response.minConfirmations);
       }
     } catch (err) {
       const message =
@@ -379,6 +382,12 @@ export function UniversalDepositComponent() {
           {/* Monospace, full-width — user copies this to their external wallet */}
           <p className="break-all font-mono text-xs text-[#F0C040]">
             {activeDeposit.depositAddress}
+          </p>
+
+          {/* One-time use warning — required disclosure per fund-safety standards */}
+          <p className="mt-2 text-[10px] text-amber-400/70">
+            ⚠ Send funds once only to this address. Multiple deposits require
+            operator-assisted recovery.
           </p>
 
           <div className="mt-3 flex items-center gap-2">

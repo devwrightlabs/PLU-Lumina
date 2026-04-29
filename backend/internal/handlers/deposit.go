@@ -61,7 +61,14 @@ func DepositAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	uid, _ := r.Context().Value(middleware.ContextKeyUID).(string)
+	uid, ok := r.Context().Value(middleware.ContextKeyUID).(string)
+	if !ok || uid == "" {
+		// The JWT middleware should always populate the UID before this handler
+		// is reached; a missing UID indicates a middleware misconfiguration or
+		// a request that bypassed authentication.
+		writeError(w, http.StatusUnauthorized, "unauthenticated: no user identity in request context")
+		return
+	}
 
 	var req models.DepositAddressRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

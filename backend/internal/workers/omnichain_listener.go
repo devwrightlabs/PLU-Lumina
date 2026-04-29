@@ -338,9 +338,14 @@ func (l *OmnichainListener) scanForDeposit(
 	deposit *models.CrossChainDeposit,
 	currentBlock int64,
 ) error {
-	// Determine the search window: scan from creation block to current head.
-	// For a newly-created deposit we use "earliest" as a safe lower bound.
-	fromBlock := "earliest"
+	// Determine the search window: only scan a bounded recent range instead of
+	// rescanning the full chain history for every polling cycle.
+	const depositScanLookbackBlocks int64 = 7200
+	startBlock := currentBlock - depositScanLookbackBlocks
+	if startBlock < 0 {
+		startBlock = 0
+	}
+	fromBlock := "0x" + strconv.FormatInt(startBlock, 16)
 
 	var txHash, amount string
 	var detectedBlock int64

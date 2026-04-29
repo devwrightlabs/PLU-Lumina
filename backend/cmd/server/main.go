@@ -100,15 +100,20 @@ func main() {
 	}
 
 	// ─── Phase 13: Omnichain Relayer ──────────────────────────────────────────
-	// The omnichain relayer is optional: all three env vars (OMNICHAIN_DEPOSIT_SEED,
-	// EVM_RPC_URL, and SOROBAN_MASTER_PROTOCOL_CONTRACT) must be set together.
+	// The omnichain relayer is optional: it is enabled only when all required
+	// env vars for the deposit store, EVM listener, and Soroban minter are set:
+	// OMNICHAIN_DEPOSIT_SEED, EVM_RPC_URL, SOROBAN_MASTER_PROTOCOL_CONTRACT,
+	// and STELLAR_HORIZON_URL.
 	// When present, the relayer:
 	//   1. Exposes POST /deposit/address so the UI can obtain one-time EVM
 	//      deposit addresses for external assets (USDT, ETH, BTC, etc.).
 	//   2. Runs the OmnichainListener goroutine that monitors the EVM chain for
 	//      incoming transfers, enforces a reorg-safe confirmation depth, and
 	//      triggers the Soroban mint_wrapped call upon confirmation.
-	if os.Getenv(services.EnvDepositSeed) != "" && os.Getenv(workers.EnvEVMRPCURL) != "" {
+	if os.Getenv(services.EnvDepositSeed) != "" &&
+		os.Getenv(workers.EnvEVMRPCURL) != "" &&
+		os.Getenv("SOROBAN_MASTER_PROTOCOL_CONTRACT") != "" &&
+		os.Getenv("STELLAR_HORIZON_URL") != "" {
 		depositStore, err := services.NewDepositStore()
 		if err != nil {
 			log.Fatalf("failed to initialise deposit store: %v", err)

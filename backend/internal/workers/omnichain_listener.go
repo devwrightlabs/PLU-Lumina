@@ -321,7 +321,7 @@ func (l *OmnichainListener) reconcileDeposit(
 		// may have previously failed before the stored state advanced to
 		// "minting". Retry the mint path so transient persistence/submission
 		// failures do not leave confirmed deposits stuck indefinitely.
-		return l.MintWrapped(ctx, deposit)
+		return l.minter.MintWrapped(ctx, deposit.ID)
 
 	default:
 		// All other states (minting, minted, failed, expired) are terminal or

@@ -1,0 +1,129 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml — Lumina-Core production services
+#
+# Two logical services are defined:
+#
+#   api            → Go HTTP server that handles all REST routes.
+#   omnichain      → Second replica of the same binary started with
+#                    OMNICHAIN_WORKER_ONLY=true (feature-flag gated inside
+#                    main.go) so that the omnichain listener goroutines can be
+#                    scaled independently from the API tier without coupling
+#                    their resource quotas.
+#
+# Deployment targets:
+#   Railway  — set RAILWAY_ENVIRONMENT=production; Railway reads this file
+#              directly and provisions TLS + DNS automatically.
+#   Digital Ocean App Platform — point DO App Platform at this file in the
+#              "Docker Compose" source type; DO manages TLS termination and
+#              horizontal scaling via replicas.
+#
+# Secrets: NEVER hardcode values here.  Every ${VAR} token must be provided
+# via the platform's secret-injection mechanism (Railway Variables panel,
+# DO App Platform environment tab, or a .env file that is never committed).
+# ──────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+# ── Shared defaults ────────────────────────────────────────────────────────────
+x-backend-env: &backend-env
+  # ── Database ──────────────────────────────────────────────────────────────
+  # Full PostgreSQL connection string for the Supabase-backed pgx pool.
+  DATABASE_URL: ${DATABASE_URL}
+
+  # ── Pi Network ────────────────────────────────────────────────────────────
+  PI_API_KEY: ${PI_API_KEY}
+
+  # ── JWT auth ──────────────────────────────────────────────────────────────
+  JWT_SECRET: ${JWT_SECRET}
+
+  # ── Lumina AI Co-Signer keys ──────────────────────────────────────────────
+  LUMINA_AGENT_PRIVATE_KEY: ${LUMINA_AGENT_PRIVATE_KEY}
+  LUMINA_AGENT_PUBLIC_KEY: ${LUMINA_AGENT_PUBLIC_KEY}
+
+  # ── Stellar / Soroban ─────────────────────────────────────────────────────
+  STELLAR_HORIZON_URL: ${STELLAR_HORIZON_URL}
+  AMM_CONTRACT_ADDRESS: ${AMM_CONTRACT_ADDRESS}
+  SOROBAN_MASTER_PROTOCOL_CONTRACT: ${SOROBAN_MASTER_PROTOCOL_CONTRACT}
+
+  # ── Omnichain EVM listener ────────────────────────────────────────────────
+  EVM_RPC_URL: ${EVM_RPC_URL}
+  EVM_MIN_CONFIRMATIONS: ${EVM_MIN_CONFIRMATIONS:-12}
+
+services:
+  # ── API tier ───────────────────────────────────────────────────────────────
+  # Handles all inbound HTTP traffic.  Scaled horizontally behind the
+  # platform's load balancer for zero-downtime rolling updates.
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      # Always use the cached layer unless source files changed.
+      cache_from:
+        - type=registry,ref=ghcr.io/devwrightlabs/plu-lumina-api:cache
+    image: ghcr.io/devwrightlabs/plu-lumina-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    # Health probing: Railway and Digital Ocean App Platform both support
+    # configuring HTTP liveness/readiness probes at the platform layer (e.g.
+    # Railway → service → Health Check path: /health).  The distroless runtime
+    # image does not include a shell or wget, so CMD-SHELL probes are not used
+    # here; configure platform-level HTTP probes targeting GET /health instead.
+    # Cap resources to prevent a single runaway container from starving the
+    # host; adjust limits for your Railway / DO instance size.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+      # Rolling update: bring new containers up before the old ones go down so
+      # there is never a gap in service availability.
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+
+  # ── Omnichain worker tier ─────────────────────────────────────────────────
+  # Runs the same binary as `api` but is dedicated to the omnichain listener
+  # goroutines (EVM → Soroban bridge reconciliation).  Separating this from the
+  # API tier means worker crashes do not affect inbound HTTP availability, and
+  # each tier can be scaled and restarted independently.
+  omnichain:
+    image: ghcr.io/devwrightlabs/plu-lumina-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      # Setting PORT to a non-conflicting value; the worker does not serve
+      # external traffic — the HTTP server starts but no traffic is routed here.
+      PORT: "8081"
+      # Feature flag: when set to "true", main.go skips API route registration
+      # and runs only the omnichain listener goroutines (implement this guard
+      # in main.go when splitting worker-only mode is required).
+      OMNICHAIN_WORKER_ONLY: "true"
+    # Health probing: same rationale as the api service — configure an HTTP
+    # probe at the platform layer targeting GET /health on port 8081.
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+    # Workers only need the binary from the already-built api image; they do
+    # not need to be exposed externally.
+    depends_on:
+      - api

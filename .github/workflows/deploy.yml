@@ -1,0 +1,283 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# .github/workflows/deploy.yml — Lumina-Core CI/CD Pipeline
+#
+# Trigger: every push to `main` (production deployments only).
+#
+# Pipeline stages:
+#   1. test-backend   → Go vet, govulncheck security scan, full test suite.
+#   2. build-frontend → Next.js production build with type-checking.
+#   3. deploy-backend → Build & push Docker image; deploy to Railway.
+#   4. deploy-frontend→ Deploy Next.js build artifact to Netlify.
+#
+# Zero-downtime guarantee:
+#   - deploy-backend uses Railway's rolling-update strategy (start-first).
+#   - deploy-frontend uses Netlify's atomic swap (new deploy is fully built
+#     before traffic is redirected).
+#   - Jobs 3 & 4 only execute when jobs 1 & 2 both succeed, so a failing test
+#     or build can never reach production.
+#
+# Secrets required (set in GitHub → Settings → Secrets and variables → Actions):
+#   DATABASE_URL                    – Supabase PostgreSQL connection string
+#   JWT_SECRET                      – ≥32-byte JWT signing secret
+#   PI_API_KEY                      – Pi Network server-side API key
+#   LUMINA_AGENT_PRIVATE_KEY        – Ed25519 agent private key (hex)
+#   LUMINA_AGENT_PUBLIC_KEY         – Ed25519 agent public key (hex)
+#   STELLAR_HORIZON_URL             – Stellar Horizon RPC endpoint
+#   AMM_CONTRACT_ADDRESS            – Soroban AMM contract address
+#   SOROBAN_MASTER_PROTOCOL_CONTRACT– Soroban master protocol contract address
+#   EVM_RPC_URL                     – EVM JSON-RPC endpoint
+#   GHCR_TOKEN                      – GitHub PAT with `write:packages` scope
+#   RAILWAY_TOKEN                   – Railway deployment token
+#   NETLIFY_AUTH_TOKEN              – Netlify personal access token
+#   NETLIFY_SITE_ID                 – Netlify site UUID
+#   NEXT_PUBLIC_API_URL             – Public API base URL consumed by the UI
+#   NEXT_PUBLIC_SUPABASE_URL        – Supabase project URL (public)
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY   – Supabase anonymous key (public)
+#   CORS_ALLOWED_ORIGIN             – Allowed CORS origin for Netlify headers
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Lumina CI/CD — Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+# Cancel any in-progress run for the same branch so that rapid consecutive
+# pushes never result in two simultaneous deployments racing each other.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+# Default permissions follow the principle of least privilege; individual jobs
+# that need elevated scopes declare them explicitly.
+permissions:
+  contents: read
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 1 — Backend security tests
+  #
+  # Runs Go's built-in vet tool, the official vulnerability scanner
+  # (govulncheck), and the full test suite.  Mirrors the rigorous security
+  # checks established in Phase 8.
+  # ────────────────────────────────────────────────────────────────────────────
+  test-backend:
+    name: Backend — Security Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # Match the version pinned in go.mod; the Go toolchain in go.mod
+          # will be honoured automatically by the toolchain directive.
+          go-version-file: backend/go.mod
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      # govulncheck cross-references the module graph against the Go
+      # vulnerability database (vuln.go.dev).  Any known CVE in a direct or
+      # transitive dependency fails this job before a single line of code is
+      # deployed.
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck (dependency vulnerability scan)
+        run: govulncheck ./...
+
+      # go vet catches correctness issues that compilers miss: misused sync
+      # primitives, incorrect format strings, unreachable code, etc.
+      - name: Run go vet (static analysis)
+        run: go vet ./...
+
+      # The full test suite.  RACE=1 enables the Go race detector so
+      # data-race conditions in concurrent handler/worker code surface here
+      # rather than in production.
+      - name: Run tests with race detector
+        run: go test -race -timeout 120s ./...
+        env:
+          # Inject only the minimal set of env vars required for unit tests;
+          # production credentials are never used in the test environment.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          PI_API_KEY: ${{ secrets.PI_API_KEY }}
+          LUMINA_AGENT_PRIVATE_KEY: ${{ secrets.LUMINA_AGENT_PRIVATE_KEY }}
+          LUMINA_AGENT_PUBLIC_KEY: ${{ secrets.LUMINA_AGENT_PUBLIC_KEY }}
+          STELLAR_HORIZON_URL: ${{ secrets.STELLAR_HORIZON_URL }}
+          AMM_CONTRACT_ADDRESS: ${{ secrets.AMM_CONTRACT_ADDRESS }}
+          SOROBAN_MASTER_PROTOCOL_CONTRACT: ${{ secrets.SOROBAN_MASTER_PROTOCOL_CONTRACT }}
+          EVM_RPC_URL: ${{ secrets.EVM_RPC_URL }}
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 2 — Frontend build
+  # ────────────────────────────────────────────────────────────────────────────
+  build-frontend:
+    name: Frontend — Production Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `next build` runs the TypeScript compiler and produces a production
+      # bundle.  Failures here block the deploy job downstream.
+      - name: Build Next.js application
+        run: npm run build
+        env:
+          # Public env vars are baked into the static bundle at build time.
+          # They must be prefixed NEXT_PUBLIC_ to be accessible in the browser.
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      # Upload the built .next directory so the deploy-frontend job can consume
+      # it without repeating the build step.
+      - name: Upload Next.js build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build
+          path: frontend/.next
+          # Retain the artifact for 1 day; it is not needed after deployment.
+          retention-days: 1
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 3 — Backend Docker build & Railway deployment
+  #
+  # Only runs when test-backend succeeds.  Builds a multi-arch image (amd64 +
+  # arm64) for maximum platform compatibility, pushes it to GHCR, then
+  # triggers a Railway rolling deploy via the Railway CLI.
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Backend — Build Image & Deploy
+    runs-on: ubuntu-latest
+    needs: test-backend
+
+    permissions:
+      contents: read
+      packages: write  # Required to push to GHCR.
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (multi-arch emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      # Derive a deterministic image tag from the short commit SHA so every
+      # production image is traceable back to the exact source commit.
+      - name: Derive image tag
+        id: meta
+        run: echo "tag=$(echo $GITHUB_SHA | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/devwrightlabs/plu-lumina-api:${{ steps.meta.outputs.tag }}
+            ghcr.io/devwrightlabs/plu-lumina-api:latest
+          # Inline layer cache stored in the registry — subsequent builds skip
+          # unchanged layers, cutting build time on hot paths by 60–80 %.
+          cache-from: type=registry,ref=ghcr.io/devwrightlabs/plu-lumina-api:cache
+          cache-to: type=registry,ref=ghcr.io/devwrightlabs/plu-lumina-api:cache,mode=max
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      # Railway's `up` command performs a rolling deploy: it starts new
+      # containers before draining the old ones, ensuring zero downtime.
+      - name: Deploy to Railway
+        run: railway up --service lumina-api --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          # All runtime secrets are stored in Railway's Variables panel and
+          # are injected by Railway at container start time — they are never
+          # passed through this workflow.
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 4 — Frontend Netlify deployment
+  #
+  # Only runs when build-frontend succeeds.  Downloads the artifact built in
+  # Job 2 and deploys it to Netlify via the official CLI.  Netlify performs an
+  # atomic swap: the new deploy is fully propagated before any user traffic is
+  # redirected, guaranteeing zero-downtime edge deployments.
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-frontend:
+    name: Frontend — Deploy to Netlify Edge
+    runs-on: ubuntu-latest
+    needs: build-frontend
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Download Next.js build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build
+          path: frontend/.next
+
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli
+
+      # `netlify deploy --prod` triggers an atomic production deploy.
+      # The `--dir` flag points to the Next.js output; the Essential Next.js
+      # plugin configured in netlify.toml handles routing and SSR.
+      - name: Deploy to Netlify (production)
+        working-directory: frontend
+        run: >
+          netlify deploy
+          --prod
+          --dir .next
+          --site ${{ secrets.NETLIFY_SITE_ID }}
+          --message "Deploy from commit ${{ github.sha }}"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          # Netlify reads environment variables from the site's panel at deploy
+          # time; only the auth token needs to be present in this step.

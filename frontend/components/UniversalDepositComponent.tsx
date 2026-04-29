@@ -126,9 +126,11 @@ export function UniversalDepositComponent() {
         onClick={handleDeposit}
         disabled={!isConnected || !amountValid}
         aria-label={
-          isConnected
-            ? `Initiate vault deposit of ${parsedAmount} π`
-            : "Connect Pi Wallet to continue"
+          !isConnected
+            ? "Connect Pi Wallet to continue"
+            : amountValid
+              ? `Initiate vault deposit of ${parsedAmount} π`
+              : "Enter a valid deposit amount to continue"
         }
         className={[
           "w-full rounded-xl py-3 text-sm font-semibold tracking-widest uppercase transition-all duration-150",

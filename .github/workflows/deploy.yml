@@ -266,18 +266,34 @@ jobs:
       - name: Install Netlify CLI
         run: npm install -g netlify-cli
 
+      # Run the Netlify build locally so `@netlify/plugin-nextjs` can convert
+      # the downloaded `.next` artifact into Netlify deploy assets such as the
+      # publish directory, functions, redirects, and edge handlers under
+      # `.netlify/`.
+      - name: Run Netlify build
+        working-directory: frontend
+        run: netlify build
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          CORS_ALLOWED_ORIGIN: ${{ secrets.CORS_ALLOWED_ORIGIN }}
+
       # `netlify deploy --prod` triggers an atomic production deploy.
-      # The `--dir` flag points to the Next.js output; the Essential Next.js
-      # plugin configured in netlify.toml handles routing and SSR.
+      # Deploy the Netlify build output so the Next.js plugin's generated
+      # functions, redirects, and other platform-specific assets are included.
       - name: Deploy to Netlify (production)
         working-directory: frontend
         run: >
           netlify deploy
           --prod
-          --dir .next
+          --dir .netlify/deploy
+          --functions .netlify/functions
           --site ${{ secrets.NETLIFY_SITE_ID }}
           --message "Deploy from commit ${{ github.sha }}"
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          # Netlify reads environment variables from the site's panel at deploy
-          # time; only the auth token needs to be present in this step.
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          # Netlify build output is deployed directly; authentication and site
+          # selection must be present in this step.

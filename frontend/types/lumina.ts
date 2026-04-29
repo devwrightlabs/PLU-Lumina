@@ -94,6 +94,12 @@ export interface DepositAddressResponse {
   /** Unix timestamp (seconds) after which the address is decommissioned. */
   expiresAt: number;
   status: CrossChainDepositStatus;
+  /**
+   * The reorg-safe confirmation depth configured on the backend listener.
+   * Derived from EVM_MIN_CONFIRMATIONS (default 12).  Display this value in
+   * the UI instead of a hardcoded constant.
+   */
+  minConfirmations: number;
 }
 
 /** Response returned by GET /deposit/:id/status. */
@@ -121,6 +127,8 @@ export interface CrossChainDepositState {
   status: CrossChainDepositStatus;
   /** How many external-chain confirmations have been observed so far. */
   confirmations: number;
+  /** The reorg-safe confirmation depth required by the backend listener. */
+  minConfirmations: number;
   externalTxHash: string | null;
   sorobanTxHash: string | null;
   failureReason: string | null;

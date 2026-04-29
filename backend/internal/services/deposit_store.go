@@ -157,6 +157,13 @@ func (s *DepositStore) CreateDeposit(
 	s.deposits[id] = deposit
 	s.mu.Unlock()
 
+	// ⚠ Address recovery notice: the SHA-256 based derivation used here
+	// produces a valid-format EVM address for monitoring purposes only.
+	// Funds sent to this address CANNOT be recovered without a separate
+	// secp256k1 HD wallet sweep service that owns the corresponding private
+	// key.  In production, replace deriveDepositAddress with go-ethereum's
+	// crypto.GenerateKey() + HD wallet derivation and ensure the sweep
+	// service indexes this key before presenting the address to users.
 	log.Printf("[deposit-store] created id=%s chain=%s asset=%s addr=%s vault=%s",
 		id, chain, asset, addr, vaultID)
 	return copyDeposit(deposit), nil

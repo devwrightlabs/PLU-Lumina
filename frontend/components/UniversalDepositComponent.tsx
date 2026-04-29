@@ -149,6 +149,9 @@ export function UniversalDepositComponent() {
             wrappedAsset: assetToWrapped(status.asset),
             status: status.status,
             confirmations: status.confirmations ?? 0,
+            // Preserve minConfirmations from the initial DepositAddressResponse;
+            // the status poll endpoint does not repeat this configuration value.
+            minConfirmations: activeDeposit?.minConfirmations ?? 12,
             externalTxHash: status.externalTxHash ?? null,
             sorobanTxHash: status.sorobanTxHash ?? null,
             failureReason: status.failureReason ?? null,
@@ -215,6 +218,9 @@ export function UniversalDepositComponent() {
           wrappedAsset: response.wrappedAsset,
           status: response.status,
           confirmations: 0,
+          // minConfirmations is returned by the backend so the UI threshold
+          // stays in sync with EVM_MIN_CONFIRMATIONS without any hardcoding.
+          minConfirmations: response.minConfirmations,
           externalTxHash: null,
           sorobanTxHash: null,
           failureReason: null,
@@ -387,7 +393,7 @@ export function UniversalDepositComponent() {
             {activeDeposit.status === "detected" &&
               activeDeposit.confirmations > 0 && (
                 <span className="text-[10px] text-white/30">
-                  ({activeDeposit.confirmations} / 12 confirmations)
+                  ({activeDeposit.confirmations} / {activeDeposit.minConfirmations} confirmations)
                 </span>
               )}
           </div>

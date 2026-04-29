@@ -206,6 +206,14 @@ func NewOmnichainListenerFromEnv(
 
 // ─── Run ──────────────────────────────────────────────────────────────────────
 
+// MinConfirmations returns the reorg-safe block depth configured on this
+// listener.  main.go passes this value to handlers.InitDepositStore so the
+// HTTP handler can include it in DepositAddressResponse, keeping the UI
+// synchronised with the backend's actual confirmation requirement.
+func (l *OmnichainListener) MinConfirmations() int {
+	return l.minConfirmations
+}
+
 // Run starts the omnichain listener loop and blocks until ctx is cancelled.
 // It must be invoked in a dedicated goroutine:
 //
@@ -347,7 +355,13 @@ func (l *OmnichainListener) scanForDeposit(
 			txHash = evmlog.TransactionHash
 			amount = decodeERC20Amount(evmlog.Data)
 			detectedBlock = hexToInt64(evmlog.BlockNumber)
-			break // First confirmed transfer wins; duplicates are edge-cases.
+			// First non-removed Transfer event wins.  If multiple transfers
+			// arrive at the same address (e.g. a user sends twice), only the
+			// first is tracked for minting.  Subsequent transfers remain at
+			// the address and must be handled by the sweep service.  For a
+			// full production deployment, consider accumulating all transfers
+			// within the deposit window and minting the aggregate amount.
+			break
 		}
 	} else {
 		// ── Native ETH / BNB / MATIC balance check ────────────────────────────

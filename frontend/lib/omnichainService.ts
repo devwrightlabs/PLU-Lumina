@@ -87,7 +87,7 @@ export async function requestDepositAddress(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        // Lumina JWT authorises the backend to act on the user's behalf;
+        // Lumina JWT authorizes the backend to act on the user's behalf;
         // the JWT sub claim is used to associate the deposit with the Pi UID.
         Authorization: `Bearer ${params.jwt}`,
       },
@@ -127,6 +127,7 @@ export async function requestDepositAddress(
     wrapped_asset: string;
     expires_at: number;
     status: string;
+    min_confirmations: number;
   };
 
   return {
@@ -137,6 +138,7 @@ export async function requestDepositAddress(
     wrappedAsset: raw.wrapped_asset,
     expiresAt: raw.expires_at,
     status: raw.status as DepositAddressResponse["status"],
+    minConfirmations: raw.min_confirmations,
   };
 }
 

@@ -113,7 +113,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to initialise deposit store: %v", err)
 		}
-		handlers.InitDepositStore(depositStore)
 
 		omnichainMinter, err := services.NewOmnichainMinter(depositStore)
 		if err != nil {
@@ -124,6 +123,11 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to initialise omnichain listener: %v", err)
 		}
+
+		// Pass the listener's resolved minConfirmations to the handler layer so
+		// POST /deposit/address can include it in the response — keeping the UI
+		// display threshold in sync with the backend's actual reorg-safety depth.
+		handlers.InitDepositStore(depositStore, omnichainListener.MinConfirmations())
 
 		omnichainCtx, omnichainCancel := context.WithCancel(context.Background())
 		defer omnichainCancel()

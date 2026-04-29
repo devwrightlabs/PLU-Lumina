@@ -26,12 +26,18 @@ import (
 var depositStore *services.DepositStore
 var depositStoreOnce sync.Once
 
-// InitDepositStore stores the shared DepositStore for use by deposit HTTP
-// handlers.  Must be called once during server startup; subsequent calls are
-// no-ops.
-func InitDepositStore(s *services.DepositStore) {
+// depositMinConfirmations is the reorg-safe confirmation depth read from the
+// omnichain listener at startup and returned to clients in DepositAddressResponse
+// so the UI can display the correct threshold without hardcoding.
+var depositMinConfirmations int
+
+// InitDepositStore stores the shared DepositStore and the configured minimum
+// confirmation count for use by deposit HTTP handlers.
+// Must be called once during server startup; subsequent calls are no-ops.
+func InitDepositStore(s *services.DepositStore, minConfirmations int) {
 	depositStoreOnce.Do(func() {
 		depositStore = s
+		depositMinConfirmations = minConfirmations
 	})
 }
 
@@ -98,13 +104,14 @@ func DepositAddress(w http.ResponseWriter, r *http.Request) {
 	wrappedSymbol := models.WrappedAsset[deposit.Asset]
 
 	writeJSON(w, http.StatusCreated, models.DepositAddressResponse{
-		DepositID:      deposit.ID,
-		DepositAddress: deposit.DepositAddress,
-		Chain:          deposit.Chain,
-		Asset:          deposit.Asset,
-		WrappedAsset:   wrappedSymbol,
-		ExpiresAt:      deposit.ExpiresAt.Unix(),
-		Status:         deposit.Status,
+		DepositID:        deposit.ID,
+		DepositAddress:   deposit.DepositAddress,
+		Chain:            deposit.Chain,
+		Asset:            deposit.Asset,
+		WrappedAsset:     wrappedSymbol,
+		ExpiresAt:        deposit.ExpiresAt.Unix(),
+		Status:           deposit.Status,
+		MinConfirmations: depositMinConfirmations,
 	})
 }
 
@@ -166,8 +173,8 @@ func resolveContractAddress(chain models.ChainID, asset models.AssetSymbol) stri
 	// Native asset symbols match their chain's native token; no contract needed.
 	nativeAssets := map[models.ChainID]models.AssetSymbol{
 		models.ChainEthereum: models.AssetETH,
-		models.ChainBSC:      "BNB",
-		models.ChainPolygon:  "MATIC",
+		models.ChainBSC:      models.AssetBNB,
+		models.ChainPolygon:  models.AssetMATIC,
 	}
 	if native, ok := nativeAssets[chain]; ok && native == asset {
 		return ""

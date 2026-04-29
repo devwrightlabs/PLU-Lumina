@@ -22,9 +22,13 @@ const (
 type AssetSymbol string
 
 const (
-	AssetETH  AssetSymbol = "ETH"
-	AssetBTC  AssetSymbol = "BTC"
-	AssetUSDT AssetSymbol = "USDT"
+	AssetETH   AssetSymbol = "ETH"
+	AssetBTC   AssetSymbol = "BTC"
+	AssetUSDT  AssetSymbol = "USDT"
+	// AssetBNB is the native asset of Binance Smart Chain.
+	AssetBNB   AssetSymbol = "BNB"
+	// AssetMATIC is the native asset of the Polygon PoS network.
+	AssetMATIC AssetSymbol = "MATIC"
 )
 
 // WrappedAsset maps each supported external asset to the Soroban token symbol
@@ -164,13 +168,17 @@ type DepositAddressRequest struct {
 
 // DepositAddressResponse is returned after successful address generation.
 type DepositAddressResponse struct {
-	DepositID      string        `json:"deposit_id"`
-	DepositAddress string        `json:"deposit_address"`
-	Chain          ChainID       `json:"chain"`
-	Asset          AssetSymbol   `json:"asset"`
-	WrappedAsset   string        `json:"wrapped_asset"`
-	ExpiresAt      int64         `json:"expires_at"`
-	Status         DepositStatus `json:"status"`
+	DepositID        string        `json:"deposit_id"`
+	DepositAddress   string        `json:"deposit_address"`
+	Chain            ChainID       `json:"chain"`
+	Asset            AssetSymbol   `json:"asset"`
+	WrappedAsset     string        `json:"wrapped_asset"`
+	ExpiresAt        int64         `json:"expires_at"`
+	Status           DepositStatus `json:"status"`
+	// MinConfirmations is the reorg-safe block depth required before the
+	// omnichain listener advances this deposit to confirmed status.
+	// The frontend should display this value rather than hardcoding a constant.
+	MinConfirmations int           `json:"min_confirmations"`
 }
 
 // DepositStatusResponse is returned by GET /deposit/{depositID}/status.

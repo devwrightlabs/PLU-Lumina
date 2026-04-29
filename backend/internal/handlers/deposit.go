@@ -50,7 +50,7 @@ func InitDepositStore(s *services.DepositStore, minConfirmations int) {
 //  1. Extract the authenticated Pi UID from the request context.
 //  2. Decode and validate the JSON request body.
 //  3. Look up the ERC-20 contract address for the requested asset (if applicable)
-//     from the OMNICHAIN_<ASSET>_CONTRACT environment variable.
+//     from the OMNICHAIN_{CHAIN}_{ASSET}_CONTRACT environment variable.
 //  4. Delegate to DepositStore.CreateDeposit to generate and persist the
 //     one-time address.
 //  5. Return the address along with its expiry timestamp and lifecycle status.

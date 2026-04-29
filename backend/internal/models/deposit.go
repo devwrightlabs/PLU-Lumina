@@ -1,5 +1,6 @@
 // Package models defines the canonical data structures used across the
-// Lumina-Core backend for multi-sig transaction management.
+// Lumina-Core backend, including multi-sig transaction management and
+// cross-chain deposit processing.
 package models
 
 import "time"

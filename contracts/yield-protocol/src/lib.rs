@@ -624,8 +624,11 @@ impl YieldProtocol {
             panic!("deposit amount must be positive");
         }
 
-        // Prevent replay: each vault tx_id may be consumed at most once.
-        let used_key = DataKey::VaultTxUsed(vault_tx_id.clone());
+        // Prevent replay: each (vault, tx_id) pair may be consumed at most once.
+        let used_key = DataKey::VaultTxUsed(VaultTxUsedKey {
+            vault_contract: vault_contract.clone(),
+            vault_tx_id: vault_tx_id.clone(),
+        });
         if env.storage().persistent().has(&used_key) {
             panic!("vault tx_id has already been consumed");
         }

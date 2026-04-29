@@ -6,7 +6,7 @@
 # binary that can run inside the distroless/scratch runtime stage without any
 # shared-library dependencies.
 # ──────────────────────────────────────────────────────────────────────────────
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
 # Install only the tools required for the build step.
 # ca-certificates is needed at build-time for `go mod download` over HTTPS.

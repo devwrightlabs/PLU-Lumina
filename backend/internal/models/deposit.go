@@ -87,7 +87,7 @@ const (
 // DepositStatusDetected until at least MinConfirmations blocks have been
 // observed above DetectedBlock on the external chain.
 type CrossChainDeposit struct {
-	// ID is a unique deterministic identifier for this deposit record.
+	// ID is a unique, collision-resistant identifier for this deposit record.
 	ID string `json:"id"`
 
 	// VaultID is the target Lumina 2-of-2 Multi-Sig Vault that receives the

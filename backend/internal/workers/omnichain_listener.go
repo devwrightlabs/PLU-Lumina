@@ -491,7 +491,12 @@ func (l *OmnichainListener) fetchCurrentBlock(ctx context.Context) (int64, error
 	if err := l.evmCall(ctx, "eth_blockNumber", []interface{}{}, &raw); err != nil {
 		return 0, fmt.Errorf("eth_blockNumber: %w", err)
 	}
-	return hexToInt64(raw), nil
+
+	block, err := hexToInt64(raw)
+	if err != nil {
+		return 0, fmt.Errorf("parse eth_blockNumber %q: %w", raw, err)
+	}
+	return block, nil
 }
 
 // fetchERC20Logs calls eth_getLogs filtering for ERC-20 Transfer events emitted

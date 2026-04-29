@@ -105,8 +105,11 @@ services:
       # Use a non-conflicting internal port. This service is not exposed
       # externally, but the same server binary still binds an HTTP port.
       PORT: "8081"
-    # Health probing: same rationale as the api service — configure an HTTP
-    # probe at the platform layer targeting GET /health on port 8081.
+    # Health probing: same rationale as the api service, but do not configure
+    # a platform HTTP probe for GET /health on port 8081 unless the backend
+    # image actually registers that endpoint for worker mode. Use the
+    # application's real health endpoint instead, or leave the worker without
+    # an HTTP probe until such an endpoint exists.
     deploy:
       resources:
         limits:

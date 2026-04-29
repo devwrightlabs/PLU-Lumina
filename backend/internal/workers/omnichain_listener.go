@@ -586,17 +586,20 @@ func padAddressToTopic(addr string) string {
 }
 
 // hexToInt64 converts a 0x-prefixed hex string to int64.
-// On parse error it logs the invalid value and returns -1 so malformed input
-// cannot be treated as a very large current block number and accidentally
-// satisfy confirmation thresholds.
-func hexToInt64(hex string) int64 {
+// It returns an error when the value cannot be parsed so callers can avoid
+// treating malformed input as a valid block number and advancing deposit state.
+func hexToInt64(hex string) (int64, error) {
 	trimmed := strings.TrimPrefix(hex, "0x")
-	n, err := strconv.ParseInt(trimmed, 16, 64)
-	if err != nil {
-		log.Printf("omnichain listener: failed to parse hex block number %q: %v", hex, err)
-		return -1
+	if trimmed == "" {
+		return 0, fmt.Errorf("empty hex value")
 	}
-	return n
+
+	n, err := strconv.ParseUint(trimmed, 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse hex block number %q: %w", hex, err)
+	}
+
+	return int64(n), nil
 }
 
 // decodeERC20Amount converts the ABI-encoded non-indexed `value` field of an

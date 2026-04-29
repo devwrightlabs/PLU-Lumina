@@ -809,7 +809,10 @@ impl YieldProtocol {
         }
 
         // Replay prevention.
-        let used_key = DataKey::VaultTxUsed(vault_tx_id.clone());
+        let used_key = DataKey::VaultTxUsed(VaultTxUsedKey {
+            vault_contract: vault_contract.clone(),
+            tx_id: vault_tx_id.clone(),
+        });
         if env.storage().persistent().has(&used_key) {
             panic!("vault tx_id has already been consumed");
         }

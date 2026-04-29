@@ -99,6 +99,40 @@ func main() {
 		log.Println("[main] STELLAR_HORIZON_URL not set; Phase 7 (AMM/chain-listener) skipped")
 	}
 
+	// ─── Phase 13: Omnichain Relayer ──────────────────────────────────────────
+	// The omnichain relayer is optional: all three env vars (OMNICHAIN_DEPOSIT_SEED,
+	// EVM_RPC_URL, and SOROBAN_MASTER_PROTOCOL_CONTRACT) must be set together.
+	// When present, the relayer:
+	//   1. Exposes POST /deposit/address so the UI can obtain one-time EVM
+	//      deposit addresses for external assets (USDT, ETH, BTC, etc.).
+	//   2. Runs the OmnichainListener goroutine that monitors the EVM chain for
+	//      incoming transfers, enforces a reorg-safe confirmation depth, and
+	//      triggers the Soroban mint_wrapped call upon confirmation.
+	if os.Getenv(services.EnvDepositSeed) != "" && os.Getenv(workers.EnvEVMRPCURL) != "" {
+		depositStore, err := services.NewDepositStore()
+		if err != nil {
+			log.Fatalf("failed to initialise deposit store: %v", err)
+		}
+		handlers.InitDepositStore(depositStore)
+
+		omnichainMinter, err := services.NewOmnichainMinter(depositStore)
+		if err != nil {
+			log.Fatalf("failed to initialise omnichain minter: %v", err)
+		}
+
+		omnichainListener, err := workers.NewOmnichainListenerFromEnv(depositStore, omnichainMinter)
+		if err != nil {
+			log.Fatalf("failed to initialise omnichain listener: %v", err)
+		}
+
+		omnichainCtx, omnichainCancel := context.WithCancel(context.Background())
+		defer omnichainCancel()
+		go omnichainListener.Run(omnichainCtx)
+		log.Println("[main] omnichain relayer started")
+	} else {
+		log.Println("[main] OMNICHAIN_DEPOSIT_SEED or EVM_RPC_URL not set; Phase 13 (omnichain relayer) skipped")
+	}
+
 	r := mux.NewRouter()
 
 	// Global middleware applied to every request.
@@ -168,6 +202,24 @@ func main() {
 	protected.Handle("/tx/{txID}/execute",
 		http.HandlerFunc(handlers.TxExecute),
 	).Methods(http.MethodPost)
+
+	// ─── Phase 13: Omnichain Relayer routes ───────────────────────────────────
+	// POST /deposit/address
+	//   Generates a unique one-time EVM deposit address for the authenticated
+	//   user's vault and the requested chain/asset pair.  The omnichain listener
+	//   monitors this address for incoming transfers and triggers a Soroban
+	//   mint_wrapped call upon confirmation.
+	protected.Handle("/deposit/address",
+		http.HandlerFunc(handlers.DepositAddress),
+	).Methods(http.MethodPost)
+
+	// GET /deposit/{depositID}/status
+	//   Returns the current lifecycle state of a cross-chain deposit.  The
+	//   frontend polls this endpoint to drive UI state transitions from
+	//   "awaiting deposit" through "confirmed" to "minted".
+	protected.Handle("/deposit/{depositID}/status",
+		http.HandlerFunc(handlers.DepositStatus),
+	).Methods(http.MethodGet)
 
 	srv := &http.Server{
 		Addr:         ":" + port,

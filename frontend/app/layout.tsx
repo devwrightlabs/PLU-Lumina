@@ -18,6 +18,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { StoreHydrator } from "@/components/StoreHydrator";
+import { PiConnectButton } from "@/components/PiConnectButton";
 
 export const metadata: Metadata = {
   title: "Lumina — Omnichain Pi Vault",
@@ -57,7 +58,7 @@ export default function RootLayout({
             </span>
           </div>
           <nav aria-label="Primary navigation">
-            <ul className="flex gap-6 text-xs font-medium tracking-widest text-white/40 uppercase">
+            <ul className="flex items-center gap-6 text-xs font-medium tracking-widest text-white/40 uppercase">
               <li>
                 <a href="/" className="transition-colors hover:text-[#F0C040]">
                   Dashboard
@@ -72,6 +73,14 @@ export default function RootLayout({
                 <a href="/history" className="transition-colors hover:text-[#F0C040]">
                   History
                 </a>
+              </li>
+              <li>
+                {/*
+                 * PiConnectButton renders the wallet connection CTA or the
+                 * authenticated identity pill depending on Zustand session state.
+                 * It is a client component and is safe to render from this RSC.
+                 */}
+                <PiConnectButton />
               </li>
             </ul>
           </nav>

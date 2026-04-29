@@ -93,22 +93,18 @@ services:
         order: stop-first
 
   # ── Omnichain worker tier ─────────────────────────────────────────────────
-  # Runs the same binary as `api` but is dedicated to the omnichain listener
-  # goroutines (EVM → Soroban bridge reconciliation).  Separating this from the
-  # API tier means worker crashes do not affect inbound HTTP availability, and
-  # each tier can be scaled and restarted independently.
+  # Reuses the same image as `api` for the omnichain listener deployment.
+  # This service is kept separate so it can be scaled and restarted
+  # independently, but the backend currently does not support a dedicated
+  # worker-only mode via compose environment flags.
   omnichain:
     image: ghcr.io/devwrightlabs/plu-lumina-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       <<: *backend-env
-      # Setting PORT to a non-conflicting value; the worker does not serve
-      # external traffic — the HTTP server starts but no traffic is routed here.
+      # Use a non-conflicting internal port. This service is not exposed
+      # externally, but the same server binary still binds an HTTP port.
       PORT: "8081"
-      # Feature flag: when set to "true", main.go skips API route registration
-      # and runs only the omnichain listener goroutines (implement this guard
-      # in main.go when splitting worker-only mode is required).
-      OMNICHAIN_WORKER_ONLY: "true"
     # Health probing: same rationale as the api service — configure an HTTP
     # probe at the platform layer targeting GET /health on port 8081.
     deploy:

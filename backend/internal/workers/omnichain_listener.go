@@ -581,12 +581,15 @@ func padAddressToTopic(addr string) string {
 }
 
 // hexToInt64 converts a 0x-prefixed hex string to int64.
-// Returns 0 on any parse error.
+// On parse error it logs the invalid value and returns a sentinel max-int64
+// block number so malformed input cannot be mistaken for an old block and
+// inflate confirmation counts.
 func hexToInt64(hex string) int64 {
-	hex = strings.TrimPrefix(hex, "0x")
-	n, err := strconv.ParseInt(hex, 16, 64)
+	trimmed := strings.TrimPrefix(hex, "0x")
+	n, err := strconv.ParseInt(trimmed, 16, 64)
 	if err != nil {
-		return 0
+		log.Printf("omnichain listener: failed to parse hex block number %q: %v", hex, err)
+		return int64(^uint64(0) >> 1)
 	}
 	return n
 }

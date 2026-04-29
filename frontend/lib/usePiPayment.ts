@@ -120,9 +120,21 @@ export function usePiPayment() {
               console.error(
                 `[Lumina] Payment approval failed — HTTP ${res.status}`,
               );
+              upsertMultiSigTx({
+                txId: paymentId,
+                status: "failed",
+                updatedAt: new Date().toISOString(),
+                xdrEnvelope: null,
+              });
             }
           } catch (err) {
             console.error("[Lumina] Payment approval request error:", err);
+            upsertMultiSigTx({
+              txId: paymentId,
+              status: "failed",
+              updatedAt: new Date().toISOString(),
+              xdrEnvelope: null,
+            });
           }
         },
 

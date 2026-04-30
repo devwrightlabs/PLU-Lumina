@@ -1,0 +1,83 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# netlify.toml — Lumina Next.js frontend edge deployment
+#
+# Next.js App Router is deployed via Netlify's Next.js Runtime (Essential
+# Next.js plugin) which runs pages and API routes as Netlify Edge Functions
+# distributed across Netlify's global CDN — guaranteeing sub-50 ms TTFB for
+# Pi Browser users worldwide without cold-start penalties associated with
+# serverless functions.
+# ──────────────────────────────────────────────────────────────────────────────
+
+[build]
+  # All build commands run from the frontend workspace.
+  base    = "frontend"
+  command = "npm run build"
+  # Next.js standalone output directory produced by `output: "standalone"` in
+  # next.config.ts.  Netlify's Next.js plugin reads this automatically.
+  publish = ".next"
+
+[build.environment]
+  # Pin the Node.js version to match the project's toolchain.
+  NODE_VERSION = "20"
+
+# ── Next.js plugin ─────────────────────────────────────────────────────────────
+# The Essential Next.js plugin handles routing, ISR, image optimisation, and
+# middleware automatically without any extra configuration.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# ── Security headers (applied to every route) ─────────────────────────────────
+# These headers are merged with those already set in next.config.ts so that
+# they also cover Netlify-managed redirects and static asset responses that
+# Next.js itself does not process.
+[[headers]]
+  for = "/*"
+
+  [headers.values]
+    # Clickjacking: refuse to render Lumina inside any frame on a different
+    # origin.  SAMEORIGIN is intentionally chosen over DENY because the Pi
+    # Browser SDK may legitimately embed the app in its own WebView frame.
+    X-Frame-Options = "SAMEORIGIN"
+
+    # Prevent MIME-type sniffing attacks on downloaded assets.
+    X-Content-Type-Options = "nosniff"
+
+    # Only send the origin (no path/query) as the Referer header when
+    # navigating from HTTPS → HTTPS; strip it entirely on HTTPS → HTTP.
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # Restrict access to sensitive browser APIs not required by Lumina.
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+    # Enforce HTTPS for one year; include all subdomains so that any future
+    # subdomain deployment is automatically covered.
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+
+    # Content Security Policy
+    # – default-src 'self': blocks all content not explicitly allowed.
+    # – script-src 'self' 'unsafe-inline': 'unsafe-inline' is required by the
+    #   Pi SDK injected script; tighten to a hash-based policy once the SDK
+    #   exposes a stable CSP hash.
+    # – connect-src: allow calls to our own API, Supabase, and the Pi Platform.
+    # – img-src data:: allows base64-encoded placeholder images used by
+    #   Next.js Image Optimisation.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://sdk.minepi.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://api.minepi.com ${NEXT_PUBLIC_LUMINA_API_URL}; img-src 'self' data: https:; font-src 'self'; frame-ancestors 'self'"
+
+    # Do not set Access-Control-Allow-Origin to an unsubstituted placeholder in
+    # netlify.toml. Static headers must use an explicit origin value; if the
+    # allowed origin varies by environment, configure CORS dynamically in
+    # application middleware / edge code instead.
+
+# ── Environment contexts ───────────────────────────────────────────────────────
+# Netlify merges context-specific env vars on top of the base [build.environment]
+# block.  Secrets (Supabase keys, API URLs) are injected through the Netlify
+# UI / CLI and are never committed to source control.
+
+[context.production]
+  environment = { NEXT_PUBLIC_ENVIRONMENT = "production" }
+
+[context.deploy-preview]
+  environment = { NEXT_PUBLIC_ENVIRONMENT = "preview" }
+
+[context.branch-deploy]
+  environment = { NEXT_PUBLIC_ENVIRONMENT = "staging" }

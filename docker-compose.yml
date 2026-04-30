@@ -1,0 +1,132 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml — Lumina-Core production services
+#
+# Two logical services are defined:
+#
+#   api            → Go HTTP server that handles all REST routes.
+#   omnichain      → Separate deployment of the same binary, used so the
+#                    omnichain-related workload can be scaled independently
+#                    from the API tier without coupling their resource quotas.
+#                    This compose file does not enable a dedicated
+#                    `OMNICHAIN_WORKER_ONLY` mode; behavior is driven by the
+#                    backend's existing environment-based configuration.
+#
+# Deployment targets:
+#   Railway  — set RAILWAY_ENVIRONMENT=production; Railway reads this file
+#              directly and provisions TLS + DNS automatically.
+#   Digital Ocean App Platform — point DO App Platform at this file in the
+#              "Docker Compose" source type; DO manages TLS termination and
+#              horizontal scaling via replicas.
+#
+# Secrets: NEVER hardcode values here.  Every ${VAR} token must be provided
+# via the platform's secret-injection mechanism (Railway Variables panel,
+# DO App Platform environment tab, or a .env file that is never committed).
+# ──────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+# ── Shared defaults ────────────────────────────────────────────────────────────
+x-backend-env: &backend-env
+  # ── Database ──────────────────────────────────────────────────────────────
+  # Full PostgreSQL connection string for the Supabase-backed pgx pool.
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+
+  # ── Pi Network ────────────────────────────────────────────────────────────
+  PI_API_KEY: ${PI_API_KEY:?PI_API_KEY is required}
+
+  # ── JWT auth ──────────────────────────────────────────────────────────────
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+
+  # ── Lumina AI Co-Signer keys ──────────────────────────────────────────────
+  LUMINA_AGENT_PRIVATE_KEY: ${LUMINA_AGENT_PRIVATE_KEY:?LUMINA_AGENT_PRIVATE_KEY is required}
+  LUMINA_AGENT_PUBLIC_KEY: ${LUMINA_AGENT_PUBLIC_KEY:?LUMINA_AGENT_PUBLIC_KEY is required}
+
+  # ── Stellar / Soroban ─────────────────────────────────────────────────────
+  STELLAR_HORIZON_URL: ${STELLAR_HORIZON_URL:?STELLAR_HORIZON_URL is required}
+  AMM_CONTRACT_ADDRESS: ${AMM_CONTRACT_ADDRESS:?AMM_CONTRACT_ADDRESS is required}
+  SOROBAN_MASTER_PROTOCOL_CONTRACT: ${SOROBAN_MASTER_PROTOCOL_CONTRACT:?SOROBAN_MASTER_PROTOCOL_CONTRACT is required}
+
+  # ── Omnichain EVM listener ────────────────────────────────────────────────
+  EVM_RPC_URL: ${EVM_RPC_URL:?EVM_RPC_URL is required}
+  OMNICHAIN_DEPOSIT_SEED: ${OMNICHAIN_DEPOSIT_SEED:?OMNICHAIN_DEPOSIT_SEED is required}
+  EVM_MIN_CONFIRMATIONS: ${EVM_MIN_CONFIRMATIONS:-12}
+
+services:
+  # ── API tier ───────────────────────────────────────────────────────────────
+  # Handles all inbound HTTP traffic.  Scaled horizontally behind the
+  # platform's load balancer for zero-downtime rolling updates.
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      # Reuse layers from the previously published image using Compose-compatible syntax.
+      cache_from:
+        - ghcr.io/devwrightlabs/plu-lumina-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/devwrightlabs/plu-lumina-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    # Health probing: Railway and Digital Ocean App Platform both support
+    # configuring HTTP liveness/readiness probes at the platform layer. The
+    # distroless runtime image does not include a shell or wget, so CMD-SHELL
+    # probes are not used here; configure any platform-level HTTP probe to
+    # target an endpoint the backend actually serves (use /health only if the
+    # application implements GET /health).
+    # Cap resources to prevent a single runaway container from starving the
+    # host; adjust limits for your Railway / DO instance size.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+      # Rolling update: bring new containers up before the old ones go down so
+      # there is never a gap in service availability.
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+
+  # ── Omnichain listener deployment ────────────────────────────────────────
+  # Reuses the same image as `api` for the omnichain listener deployment.
+  # This service is kept separate so it can be scaled and restarted
+  # independently, but it is not a true worker-only runtime: the backend
+  # currently runs the same server binary and does not expose a dedicated
+  # worker-only mode via compose environment flags.
+  omnichain:
+    image: ghcr.io/devwrightlabs/plu-lumina-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      # Use a non-conflicting internal port. This service is not exposed
+      # externally, but the same server binary still binds an HTTP port.
+      PORT: "8081"
+    # Health probing: same rationale as the api service, but do not configure
+    # a platform HTTP probe for GET /health on port 8081 unless the backend
+    # image actually registers that endpoint for worker mode. Use the
+    # application's real health endpoint instead, or leave the worker without
+    # an HTTP probe until such an endpoint exists.
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+    # Workers only need the binary from the already-built api image; they do
+    # not need to be exposed externally.
+    depends_on:
+      - api

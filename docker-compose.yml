@@ -93,10 +93,11 @@ services:
         parallelism: 1
         order: stop-first
 
-  # ── Omnichain worker tier ─────────────────────────────────────────────────
+  # ── Omnichain listener deployment ────────────────────────────────────────
   # Reuses the same image as `api` for the omnichain listener deployment.
   # This service is kept separate so it can be scaled and restarted
-  # independently, but the backend currently does not support a dedicated
+  # independently, but it is not a true worker-only runtime: the backend
+  # currently runs the same server binary and does not expose a dedicated
   # worker-only mode via compose environment flags.
   omnichain:
     image: ghcr.io/devwrightlabs/plu-lumina-api:${IMAGE_TAG:-latest}

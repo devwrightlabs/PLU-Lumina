@@ -63,10 +63,10 @@
     #   Next.js Image Optimisation.
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://sdk.minepi.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://api.minepi.com ${NEXT_PUBLIC_LUMINA_API_URL}; img-src 'self' data: https:; font-src 'self'; frame-ancestors 'self'"
 
-    # CORS: only our production API origin is allowed to make cross-origin
-    # requests to Netlify's edge layer.  Adjust the value via Netlify's
-    # environment variable panel — never hardcode production domains here.
-    Access-Control-Allow-Origin = "${CORS_ALLOWED_ORIGIN}"
+    # Do not set Access-Control-Allow-Origin to an unsubstituted placeholder in
+    # netlify.toml. Static headers must use an explicit origin value; if the
+    # allowed origin varies by environment, configure CORS dynamically in
+    # application middleware / edge code instead.
 
 # ── Environment contexts ───────────────────────────────────────────────────────
 # Netlify merges context-specific env vars on top of the base [build.environment]

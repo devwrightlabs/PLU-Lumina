@@ -22,14 +22,15 @@ RUN go mod download
 
 # Copy the remaining source and compile.
 # TARGETARCH is injected by Docker Buildx when building multi-platform images
-# (e.g. linux/amd64 and linux/arm64).  This single build stage covers all
-# target platforms without requiring separate Dockerfile variants.
+# (e.g. linux/amd64 and linux/arm64). When it is not provided (such as a
+# plain `docker build`), fall back to the builder image's native Go arch so
+# local single-platform builds continue to work.
 # -trimpath removes host filesystem paths from the binary (hardening).
 # -ldflags "-s -w" strips the symbol table and DWARF debug info, shrinking the
 # final binary by ~30 % with zero runtime cost.
 ARG TARGETARCH
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-$(go env GOARCH)} \
     go build \
       -trimpath \
       -ldflags="-s -w" \

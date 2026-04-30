@@ -4,11 +4,12 @@
 # Two logical services are defined:
 #
 #   api            → Go HTTP server that handles all REST routes.
-#   omnichain      → Second replica of the same binary started with
-#                    OMNICHAIN_WORKER_ONLY=true (feature-flag gated inside
-#                    main.go) so that the omnichain listener goroutines can be
-#                    scaled independently from the API tier without coupling
-#                    their resource quotas.
+#   omnichain      → Separate deployment of the same binary, used so the
+#                    omnichain-related workload can be scaled independently
+#                    from the API tier without coupling their resource quotas.
+#                    This compose file does not enable a dedicated
+#                    `OMNICHAIN_WORKER_ONLY` mode; behavior is driven by the
+#                    backend's existing environment-based configuration.
 #
 # Deployment targets:
 #   Railway  — set RAILWAY_ENVIRONMENT=production; Railway reads this file

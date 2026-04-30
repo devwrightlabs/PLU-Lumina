@@ -165,14 +165,17 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # Job 3 — Backend Docker build & Railway deployment
   #
-  # Only runs when test-backend succeeds.  Builds a multi-arch image (amd64 +
-  # arm64) for maximum platform compatibility, pushes it to GHCR, then
-  # triggers a Railway rolling deploy via the Railway CLI.
+  # Only runs when both test-backend and build-frontend succeed. Builds a
+  # multi-arch image (amd64 + arm64) for maximum platform compatibility,
+  # pushes it to GHCR, then triggers a Railway rolling deploy via the Railway
+  # CLI.
   # ────────────────────────────────────────────────────────────────────────────
   deploy-backend:
     name: Backend — Build Image & Deploy
     runs-on: ubuntu-latest
-    needs: test-backend
+    needs:
+      - test-backend
+      - build-frontend
 
     permissions:
       contents: read

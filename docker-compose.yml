@@ -29,25 +29,25 @@ version: "3.9"
 x-backend-env: &backend-env
   # ── Database ──────────────────────────────────────────────────────────────
   # Full PostgreSQL connection string for the Supabase-backed pgx pool.
-  DATABASE_URL: ${DATABASE_URL}
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
 
   # ── Pi Network ────────────────────────────────────────────────────────────
-  PI_API_KEY: ${PI_API_KEY}
+  PI_API_KEY: ${PI_API_KEY:?PI_API_KEY is required}
 
   # ── JWT auth ──────────────────────────────────────────────────────────────
-  JWT_SECRET: ${JWT_SECRET}
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
 
   # ── Lumina AI Co-Signer keys ──────────────────────────────────────────────
-  LUMINA_AGENT_PRIVATE_KEY: ${LUMINA_AGENT_PRIVATE_KEY}
-  LUMINA_AGENT_PUBLIC_KEY: ${LUMINA_AGENT_PUBLIC_KEY}
+  LUMINA_AGENT_PRIVATE_KEY: ${LUMINA_AGENT_PRIVATE_KEY:?LUMINA_AGENT_PRIVATE_KEY is required}
+  LUMINA_AGENT_PUBLIC_KEY: ${LUMINA_AGENT_PUBLIC_KEY:?LUMINA_AGENT_PUBLIC_KEY is required}
 
   # ── Stellar / Soroban ─────────────────────────────────────────────────────
-  STELLAR_HORIZON_URL: ${STELLAR_HORIZON_URL}
-  AMM_CONTRACT_ADDRESS: ${AMM_CONTRACT_ADDRESS}
-  SOROBAN_MASTER_PROTOCOL_CONTRACT: ${SOROBAN_MASTER_PROTOCOL_CONTRACT}
+  STELLAR_HORIZON_URL: ${STELLAR_HORIZON_URL:?STELLAR_HORIZON_URL is required}
+  AMM_CONTRACT_ADDRESS: ${AMM_CONTRACT_ADDRESS:?AMM_CONTRACT_ADDRESS is required}
+  SOROBAN_MASTER_PROTOCOL_CONTRACT: ${SOROBAN_MASTER_PROTOCOL_CONTRACT:?SOROBAN_MASTER_PROTOCOL_CONTRACT is required}
 
   # ── Omnichain EVM listener ────────────────────────────────────────────────
-  EVM_RPC_URL: ${EVM_RPC_URL}
+  EVM_RPC_URL: ${EVM_RPC_URL:?EVM_RPC_URL is required}
   EVM_MIN_CONFIRMATIONS: ${EVM_MIN_CONFIRMATIONS:-12}
 
 services:

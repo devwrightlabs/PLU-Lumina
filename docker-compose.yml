@@ -48,6 +48,7 @@ x-backend-env: &backend-env
 
   # ── Omnichain EVM listener ────────────────────────────────────────────────
   EVM_RPC_URL: ${EVM_RPC_URL:?EVM_RPC_URL is required}
+  OMNICHAIN_DEPOSIT_SEED: ${OMNICHAIN_DEPOSIT_SEED:?OMNICHAIN_DEPOSIT_SEED is required}
   EVM_MIN_CONFIRMATIONS: ${EVM_MIN_CONFIRMATIONS:-12}
 
 services:

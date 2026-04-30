@@ -100,21 +100,11 @@ jobs:
 
       # The full test suite.  RACE=1 enables the Go race detector so
       # data-race conditions in concurrent handler/worker code surface here
-      # rather than in production.
+      # rather than in production. Tests run without deployment secrets to
+      # avoid exposing production credentials in CI when `go test` does not
+      # require them.
       - name: Run tests with race detector
         run: go test -race -timeout 120s ./...
-        env:
-          # Inject only the minimal set of env vars required for unit tests;
-          # production credentials are never used in the test environment.
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          PI_API_KEY: ${{ secrets.PI_API_KEY }}
-          LUMINA_AGENT_PRIVATE_KEY: ${{ secrets.LUMINA_AGENT_PRIVATE_KEY }}
-          LUMINA_AGENT_PUBLIC_KEY: ${{ secrets.LUMINA_AGENT_PUBLIC_KEY }}
-          STELLAR_HORIZON_URL: ${{ secrets.STELLAR_HORIZON_URL }}
-          AMM_CONTRACT_ADDRESS: ${{ secrets.AMM_CONTRACT_ADDRESS }}
-          SOROBAN_MASTER_PROTOCOL_CONTRACT: ${{ secrets.SOROBAN_MASTER_PROTOCOL_CONTRACT }}
-          EVM_RPC_URL: ${{ secrets.EVM_RPC_URL }}
 
   # ────────────────────────────────────────────────────────────────────────────
   # Job 2 — Frontend build

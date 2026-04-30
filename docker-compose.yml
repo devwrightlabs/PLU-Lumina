@@ -69,10 +69,11 @@ services:
     ports:
       - "8080:8080"
     # Health probing: Railway and Digital Ocean App Platform both support
-    # configuring HTTP liveness/readiness probes at the platform layer (e.g.
-    # Railway → service → Health Check path: /health).  The distroless runtime
-    # image does not include a shell or wget, so CMD-SHELL probes are not used
-    # here; configure platform-level HTTP probes targeting GET /health instead.
+    # configuring HTTP liveness/readiness probes at the platform layer. The
+    # distroless runtime image does not include a shell or wget, so CMD-SHELL
+    # probes are not used here; configure any platform-level HTTP probe to
+    # target an endpoint the backend actually serves (use /health only if the
+    # application implements GET /health).
     # Cap resources to prevent a single runaway container from starving the
     # host; adjust limits for your Railway / DO instance size.
     deploy:

@@ -5,7 +5,7 @@ const PI_SDK_VERSION = "2.0";
 const PI_SCOPES: PiScope[] = ["username", "payments"];
 
 export function usePiSDK() {
-  const { setPiSession, upsertMultiSigTx } = useLuminaStore();
+  const { setPiSession, upsertPendingPayment } = useLuminaStore();
 
   const initialised = useRef(false);
 
@@ -23,14 +23,13 @@ export function usePiSDK() {
 
   const handleIncompletePayment = useCallback(
     (payment: PiPaymentDTO) => {
-      upsertMultiSigTx({
-        txId: payment.identifier,
-        status: "pending_owner",
+      upsertPendingPayment({
+        paymentId: payment.identifier,
+        status: "pending_approval",
         updatedAt: new Date().toISOString(),
-        xdrEnvelope: null,
       });
     },
-    [upsertMultiSigTx],
+    [upsertPendingPayment],
   );
 
   const connectWallet = useCallback(async (): Promise<void> => {
@@ -84,3 +83,4 @@ export function usePiSDK() {
 
   return { connectWallet };
 }
+

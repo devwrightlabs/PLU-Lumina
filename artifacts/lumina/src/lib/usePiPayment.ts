@@ -7,7 +7,7 @@ export interface DepositParams {
 }
 
 export function usePiPayment() {
-  const { piSession, upsertMultiSigTx } = useLuminaStore();
+  const { piSession, upsertPendingPayment } = useLuminaStore();
 
   const initiateDeposit = useCallback(
     ({ amount, memo = "Lumina vault deposit" }: DepositParams): void => {
@@ -43,11 +43,10 @@ export function usePiPayment() {
 
       window.Pi.createPayment(paymentData, {
         onReadyForServerApproval: async (paymentId: string) => {
-          upsertMultiSigTx({
-            txId: paymentId,
-            status: "pending_owner",
+          upsertPendingPayment({
+            paymentId,
+            status: "pending_approval",
             updatedAt: new Date().toISOString(),
-            xdrEnvelope: null,
           });
 
           try {
@@ -66,20 +65,18 @@ export function usePiPayment() {
               console.error(
                 `[Lumina] Payment approval failed — HTTP ${res.status}`,
               );
-              upsertMultiSigTx({
-                txId: paymentId,
+              upsertPendingPayment({
+                paymentId,
                 status: "failed",
                 updatedAt: new Date().toISOString(),
-                xdrEnvelope: null,
               });
             }
           } catch (err) {
             console.error("[Lumina] Payment approval request error:", err);
-            upsertMultiSigTx({
-              txId: paymentId,
+            upsertPendingPayment({
+              paymentId,
               status: "failed",
               updatedAt: new Date().toISOString(),
-              xdrEnvelope: null,
             });
           }
         },
@@ -88,11 +85,10 @@ export function usePiPayment() {
           paymentId: string,
           txid: string,
         ) => {
-          upsertMultiSigTx({
-            txId: paymentId,
-            status: "pending_agent",
+          upsertPendingPayment({
+            paymentId,
+            status: "processing",
             updatedAt: new Date().toISOString(),
-            xdrEnvelope: null,
           });
 
           try {
@@ -109,62 +105,55 @@ export function usePiPayment() {
             );
 
             if (res.ok) {
-              const { xdrEnvelope } = (await res.json()) as {
-                xdrEnvelope: string | null;
-              };
-
-              upsertMultiSigTx({
-                txId: paymentId,
+              upsertPendingPayment({
+                paymentId,
                 status: "confirmed",
+                txid,
                 updatedAt: new Date().toISOString(),
-                xdrEnvelope: xdrEnvelope ?? null,
               });
             } else {
               console.error(
                 `[Lumina] Payment completion failed — HTTP ${res.status}`,
               );
-              upsertMultiSigTx({
-                txId: paymentId,
+              upsertPendingPayment({
+                paymentId,
                 status: "failed",
                 updatedAt: new Date().toISOString(),
-                xdrEnvelope: null,
               });
             }
           } catch (err) {
             console.error("[Lumina] Payment completion request error:", err);
-            upsertMultiSigTx({
-              txId: paymentId,
+            upsertPendingPayment({
+              paymentId,
               status: "failed",
               updatedAt: new Date().toISOString(),
-              xdrEnvelope: null,
             });
           }
         },
 
         onCancel: (paymentId: string) => {
-          upsertMultiSigTx({
-            txId: paymentId,
+          upsertPendingPayment({
+            paymentId,
             status: "failed",
             updatedAt: new Date().toISOString(),
-            xdrEnvelope: null,
           });
         },
 
         onError: (error: Error, payment?: PiPaymentDTO) => {
           console.error("[Lumina] Pi payment SDK error:", error);
           if (payment) {
-            upsertMultiSigTx({
-              txId: payment.identifier,
+            upsertPendingPayment({
+              paymentId: payment.identifier,
               status: "failed",
               updatedAt: new Date().toISOString(),
-              xdrEnvelope: null,
             });
           }
         },
       });
     },
-    [piSession, upsertMultiSigTx],
+    [piSession, upsertPendingPayment],
   );
 
   return { initiateDeposit };
 }
+

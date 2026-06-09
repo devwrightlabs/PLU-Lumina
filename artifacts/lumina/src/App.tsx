@@ -2,7 +2,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { StoreHydrator } from "./components/StoreHydrator";
 import { PiConnectButton } from "./components/PiConnectButton";
 import { UniversalDepositComponent } from "./components/UniversalDepositComponent";
-import { MultiSigTracker } from "./components/MultiSigTracker";
+import { PaymentStatusTracker } from "./components/PaymentStatusTracker";
 
 function DashboardPage() {
   return (
@@ -25,7 +25,7 @@ function DashboardPage() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {[
                 { label: "Vault Status", value: "Awaiting Auth" },
-                { label: "Multi-Sig", value: "2-of-2" },
+                { label: "Auth", value: "Pi Network" },
                 { label: "Network", value: "Pi Mainnet" },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-xl bg-[#0A0A0F] px-4 py-3">
@@ -42,9 +42,9 @@ function DashboardPage() {
 
           <div className="rounded-2xl border border-[#F0C040]/20 bg-[#0F0F1A] p-6 shadow-lg shadow-black/40">
             <h2 className="mb-4 text-lg font-semibold tracking-widest text-[#F0C040] uppercase">
-              Multi-Sig Transactions
+              Payment Status
             </h2>
-            <MultiSigTracker />
+            <PaymentStatusTracker />
           </div>
         </div>
 

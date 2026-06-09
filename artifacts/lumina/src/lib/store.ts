@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   PiSession,
-  MultiSigTransaction,
+  PendingPayment,
   OmnichainBalances,
   CrossChainDepositState,
 } from "../types/lumina";
@@ -12,9 +12,9 @@ interface LuminaState {
   setPiSession: (session: Partial<PiSession>) => void;
   clearPiSession: () => void;
 
-  multiSigTxs: Record<string, MultiSigTransaction>;
-  upsertMultiSigTx: (tx: MultiSigTransaction) => void;
-  removeMultiSigTx: (txId: string) => void;
+  pendingPayments: Record<string, PendingPayment>;
+  upsertPendingPayment: (payment: PendingPayment) => void;
+  removePendingPayment: (paymentId: string) => void;
 
   balances: OmnichainBalances;
   setBalances: (balances: Partial<OmnichainBalances>) => void;
@@ -52,18 +52,21 @@ export const useLuminaStore = create<LuminaState>()(
       clearPiSession: () =>
         set({ piSession: DEFAULT_SESSION }),
 
-      multiSigTxs: {},
+      pendingPayments: {},
 
-      upsertMultiSigTx: (tx) =>
+      upsertPendingPayment: (payment) =>
         set((state) => ({
-          multiSigTxs: { ...state.multiSigTxs, [tx.txId]: tx },
+          pendingPayments: {
+            ...state.pendingPayments,
+            [payment.paymentId]: payment,
+          },
         })),
 
-      removeMultiSigTx: (txId) =>
+      removePendingPayment: (paymentId) =>
         set((state) => {
-          const next = { ...state.multiSigTxs };
-          delete next[txId];
-          return { multiSigTxs: next };
+          const next = { ...state.pendingPayments };
+          delete next[paymentId];
+          return { pendingPayments: next };
         }),
 
       balances: DEFAULT_BALANCES,
@@ -98,7 +101,7 @@ export const useLuminaStore = create<LuminaState>()(
       skipHydration: true,
       partialize: (state) => ({
         balances: state.balances,
-        multiSigTxs: state.multiSigTxs,
+        pendingPayments: state.pendingPayments,
         crossChainDeposits: state.crossChainDeposits,
       }),
     }

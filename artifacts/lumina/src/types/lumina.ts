@@ -15,18 +15,17 @@ export interface PiSession {
   luminaJwt: string | null;
 }
 
-export type MultiSigTxStatus =
-  | "pending_owner"
-  | "pending_agent"
-  | "broadcasting"
+export type PaymentStatus =
+  | "pending_approval"
+  | "processing"
   | "confirmed"
   | "failed";
 
-export interface MultiSigTransaction {
-  txId: string;
-  status: MultiSigTxStatus;
+export interface PendingPayment {
+  paymentId: string;
+  status: PaymentStatus;
+  txid?: string;
   updatedAt: string;
-  xdrEnvelope: string | null;
 }
 
 export interface OmnichainBalances {

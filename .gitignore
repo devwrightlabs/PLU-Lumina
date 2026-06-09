@@ -1,35 +1,49 @@
-# Go build artifacts
-backend/lumina-core
-backend/*.exe
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# Rust / Cargo build artifacts
-contracts/target/
-contracts/yield-protocol/target/
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
 
-# Go module download cache (only commit go.sum, not the cache)
-# go.sum is intentionally committed
+# dependencies
+node_modules
 
-# Environment files — never commit secrets
-.env
-.env.*
-!.env.example
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
 
-# OS artifacts
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
 .DS_Store
 Thumbs.db
 
-# Editor artifacts
-.vscode/
-.idea/
-*.swp
-*.swo
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
 
-# ── Frontend (Next.js) ────────────────────────────────────────────────────────
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/.env.local
-frontend/.env.development.local
-frontend/.env.test.local
-frontend/.env.production.local
-
+# Replit
+.cache/
+.local/

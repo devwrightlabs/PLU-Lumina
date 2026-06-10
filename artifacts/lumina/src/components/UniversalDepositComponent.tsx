@@ -7,6 +7,8 @@ import {
   isTerminalStatus,
   OmnichainServiceError,
 } from "../lib/omnichainService";
+import { LUMINA_CONTRACTS, PI_NETWORK_CONFIG } from "../lib/contracts";
+import { simulateVaultDeposit } from "../lib/sorobanVault";
 import type {
   CrossChainID,
   CrossChainAsset,
@@ -77,7 +79,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export function UniversalDepositComponent() {
-  const { piSession, balances, upsertCrossChainDeposit } = useLuminaStore();
+  const { piSession, balances, upsertCrossChainDeposit, pendingPayments } = useLuminaStore();
   const { initiateDeposit } = usePiPayment();
 
   const [selectedTab, setSelectedTab] = useState<AssetTab>("PI");
@@ -88,7 +90,13 @@ export function UniversalDepositComponent() {
   const [activeDeposit, setActiveDeposit] =
     useState<CrossChainDepositState | null>(null);
 
+  const [simulationStatus, setSimulationStatus] = useState<
+    "idle" | "simulating" | "ok" | "error"
+  >("idle");
+  const [simulationFee, setSimulationFee] = useState<string | null>(null);
+
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const simTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isConnected = piSession.status === "connected";
   const parsedAmount = parseFloat(amount);
@@ -101,8 +109,46 @@ export function UniversalDepositComponent() {
       if (pollIntervalRef.current !== null) {
         clearInterval(pollIntervalRef.current);
       }
+      if (simTimerRef.current !== null) {
+        clearTimeout(simTimerRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (selectedTab !== "PI" || !amountValid || !isConnected) {
+      setSimulationStatus("idle");
+      setSimulationFee(null);
+      return;
+    }
+
+    if (simTimerRef.current !== null) {
+      clearTimeout(simTimerRef.current);
+    }
+
+    setSimulationStatus("simulating");
+
+    simTimerRef.current = setTimeout(() => {
+      const userAddress = piSession.user?.walletAddress ?? "";
+      simulateVaultDeposit(userAddress, parsedAmount)
+        .then((result) => {
+          if (result.skipped) {
+            setSimulationStatus("idle");
+            setSimulationFee(null);
+          } else if (result.success) {
+            setSimulationStatus("ok");
+            setSimulationFee(result.minFee);
+          } else {
+            setSimulationStatus("error");
+            setSimulationFee(null);
+          }
+        })
+        .catch(() => {
+          setSimulationStatus("error");
+          setSimulationFee(null);
+        });
+    }, 600);
+  }, [selectedTab, amountValid, parsedAmount, isConnected, piSession.user?.uid]);
 
   const startPolling = useCallback(
     (depositId: string, minConfirmations: number) => {
@@ -312,6 +358,53 @@ export function UniversalDepositComponent() {
           />
         </div>
       )}
+
+      <div className="mb-4 rounded-xl border border-white/5 bg-[#0A0A0F] px-4 py-3">
+        <p className="mb-1 text-[10px] font-medium tracking-widest text-white/30 uppercase">
+          Vault Contract
+        </p>
+        <p className="truncate font-mono text-[10px] text-[#F0C040]/70">
+          {LUMINA_CONTRACTS.VAULT}
+        </p>
+        <p className="mt-1 text-[10px] text-white/20">
+          {PI_NETWORK_CONFIG.isSandbox ? "π Testnet" : "π Mainnet"} · Soroban
+        </p>
+      </div>
+
+      {selectedTab === "PI" && isConnected && amountValid && (
+        <div className="mb-4 flex items-center gap-2">
+          {simulationStatus === "simulating" && (
+            <span className="text-[10px] text-white/30">Simulating contract call…</span>
+          )}
+          {simulationStatus === "ok" && (
+            <span className="text-[10px] text-emerald-400/70">
+              ✓ Vault simulation passed
+              {simulationFee ? ` · est. fee ${simulationFee} stroops` : ""}
+            </span>
+          )}
+          {simulationStatus === "error" && (
+            <span className="text-[10px] text-amber-400/60">
+              ⚠ Simulation unavailable (testnet RPC unreachable)
+            </span>
+          )}
+        </div>
+      )}
+
+      {selectedTab === "PI" && (() => {
+        const confirmedPi = Object.values(pendingPayments).find(
+          (p) => p.status === "confirmed" && p.sorobanTxHash,
+        );
+        return confirmedPi?.sorobanTxHash ? (
+          <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+            <p className="mb-1 text-[10px] font-medium tracking-widest text-emerald-400/60 uppercase">
+              Last Soroban tx
+            </p>
+            <p className="truncate font-mono text-[10px] text-emerald-400">
+              {confirmedPi.sorobanTxHash}
+            </p>
+          </div>
+        ) : null;
+      })()}
 
       {depositError && (
         <p

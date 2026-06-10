@@ -7,6 +7,7 @@ export type PiConnectionStatus =
 export interface PiUser {
   uid: string;
   username: string;
+  walletAddress: string | null;
 }
 
 export interface PiSession {
@@ -25,6 +26,7 @@ export interface PendingPayment {
   paymentId: string;
   status: PaymentStatus;
   txid?: string;
+  sorobanTxHash?: string;
   updatedAt: string;
 }
 

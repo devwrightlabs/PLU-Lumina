@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useLuminaStore } from "./store";
 
 const PI_SDK_VERSION = "2.0";
-const PI_SCOPES: PiScope[] = ["username", "payments"];
+const PI_SCOPES: PiScope[] = ["username", "payments", "wallet_address"];
 
 export function usePiSDK() {
   const { setPiSession, upsertPendingPayment } = useLuminaStore();
@@ -72,6 +72,7 @@ export function usePiSDK() {
         user: {
           uid: authResult.user.uid,
           username: authResult.user.username,
+          walletAddress: authResult.user.wallet_address ?? null,
         },
         luminaJwt: jwt,
       });

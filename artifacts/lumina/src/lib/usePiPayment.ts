@@ -6,6 +6,8 @@ export interface DepositParams {
   memo?: string;
 }
 
+const PI_STROOPS_PER_PI = 1_000_000;
+
 export function usePiPayment() {
   const { piSession, upsertPendingPayment } = useLuminaStore();
 
@@ -31,6 +33,7 @@ export function usePiPayment() {
       }
 
       const jwt = piSession.luminaJwt;
+      const amountStroops = String(Math.round(amount * PI_STROOPS_PER_PI));
 
       const paymentData: PiPaymentData = {
         amount,
@@ -100,15 +103,22 @@ export function usePiPayment() {
                   "Content-Type": "application/json",
                   Authorization: `Bearer ${jwt}`,
                 },
-                body: JSON.stringify({ txid }),
+                body: JSON.stringify({ txid, amountStroops }),
               },
             );
 
             if (res.ok) {
+              const body = (await res.json()) as {
+                paymentId: string;
+                txid: string;
+                status: string;
+                sorobanTxHash?: string | null;
+              };
               upsertPendingPayment({
                 paymentId,
                 status: "confirmed",
                 txid,
+                sorobanTxHash: body.sorobanTxHash ?? undefined,
                 updatedAt: new Date().toISOString(),
               });
             } else {
@@ -156,4 +166,3 @@ export function usePiPayment() {
 
   return { initiateDeposit };
 }
-

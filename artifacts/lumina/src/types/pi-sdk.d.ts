@@ -28,6 +28,7 @@ declare global {
     user: {
       uid: string;
       username: string;
+      wallet_address?: string;
     };
     accessToken: string;
   }

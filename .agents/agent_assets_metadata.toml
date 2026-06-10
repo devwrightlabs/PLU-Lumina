@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "dDFL3gyFSP9_uzHk3iZ5m"
+uri = "file://artifacts/lumina-mobile/assets/images/icon.png"
+type = "image"
+title = "generated_image"

@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/lumina-mobile/"
+title = "Lumina Mobile"
+version = "1.0.0"
+id = "artifacts/lumina-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/lumina-mobile/" ]
+localPort = 18154
+
+[services.development]
+run = "pnpm --filter @workspace/lumina-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/lumina-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/lumina-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "18154"
+BASE_PATH = "/lumina-mobile/"

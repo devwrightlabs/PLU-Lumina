@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowDownToLine, Loader2, CheckCircle2, Copy, AlertTriangle, Zap, Info } from "lucide-react";
 import { useLuminaStore } from "../lib/store";
 import { usePiPayment } from "../lib/usePiPayment";
 import {
@@ -19,40 +21,55 @@ type AssetTab = "PI" | CrossChainAsset;
 
 interface AssetConfig {
   label: string;
+  icon: string;
   chain: CrossChainID | null;
   asset: CrossChainAsset | null;
   symbol: string;
   description: string;
+  accentColor: string;
+  bgColor: string;
 }
 
 const ASSET_CONFIGS: Record<AssetTab, AssetConfig> = {
   PI: {
     label: "π Pi",
+    icon: "π",
     chain: null,
     asset: null,
     symbol: "π",
-    description: "Deposit native Pi into your Lumina vault",
+    description: "Deposit native Pi via Pi Browser — secured by your Pi Wallet",
+    accentColor: "text-[#F0C040]",
+    bgColor: "bg-[#F0C040]/10 border-[#F0C040]/20",
   },
   ETH: {
     label: "ETH",
+    icon: "Ξ",
     chain: "ETH",
     asset: "ETH",
     symbol: "ETH",
-    description: "Deposit ETH → minted as piETH in your vault",
+    description: "Send ETH — minted as piETH in your Lumina vault",
+    accentColor: "text-blue-400",
+    bgColor: "bg-blue-400/10 border-blue-400/20",
   },
   USDT: {
     label: "USDT",
+    icon: "$",
     chain: "ETH",
     asset: "USDT",
     symbol: "USDT",
-    description: "Deposit ERC-20 USDT → minted as piUSDT in your vault",
+    description: "Send ERC-20 USDT — minted as piUSDT in your vault",
+    accentColor: "text-emerald-400",
+    bgColor: "bg-emerald-400/10 border-emerald-400/20",
   },
   BTC: {
     label: "BTC",
+    icon: "₿",
     chain: "ETH",
     asset: "BTC",
     symbol: "BTC",
-    description: "Deposit wrapped BTC → minted as piBTC in your vault",
+    description: "Send wrapped BTC — minted as piBTC in your vault",
+    accentColor: "text-orange-400",
+    bgColor: "bg-orange-400/10 border-orange-400/20",
   },
 };
 
@@ -60,10 +77,10 @@ const ASSET_TABS: AssetTab[] = ["PI", "ETH", "USDT", "BTC"];
 
 const STATUS_LABEL: Record<string, string> = {
   pending:   "Awaiting deposit…",
-  detected:  "Transfer detected — accumulating confirmations",
-  confirmed: "Confirmed — minting wrapped asset",
+  detected:  "Transfer detected",
+  confirmed: "Confirmed — minting",
   minting:   "Minting on Pi Network…",
-  minted:    "✓ Minted to your vault",
+  minted:    "Minted to vault",
   failed:    "Deposit failed",
   expired:   "Address expired",
 };
@@ -78,21 +95,38 @@ const STATUS_COLOR: Record<string, string> = {
   expired:   "text-white/30",
 };
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="shrink-0 rounded-lg p-1.5 text-white/30 hover:text-[#F0C040] hover:bg-[#F0C040]/10 transition-all"
+      title="Copy address"
+    >
+      {copied
+        ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+        : <Copy className="h-3.5 w-3.5" />
+      }
+    </button>
+  );
+}
+
 export function UniversalDepositComponent() {
-  const { piSession, balances, upsertCrossChainDeposit, pendingPayments } = useLuminaStore();
+  const { piSession, upsertCrossChainDeposit, pendingPayments } = useLuminaStore();
   const { initiateDeposit } = usePiPayment();
 
   const [selectedTab, setSelectedTab] = useState<AssetTab>("PI");
   const [amount, setAmount] = useState("1");
   const [depositError, setDepositError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  const [activeDeposit, setActiveDeposit] =
-    useState<CrossChainDepositState | null>(null);
-
-  const [simulationStatus, setSimulationStatus] = useState<
-    "idle" | "simulating" | "ok" | "error"
-  >("idle");
+  const [activeDeposit, setActiveDeposit] = useState<CrossChainDepositState | null>(null);
+  const [simulationStatus, setSimulationStatus] = useState<"idle" | "simulating" | "ok" | "error">("idle");
   const [simulationFee, setSimulationFee] = useState<string | null>(null);
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -101,17 +135,12 @@ export function UniversalDepositComponent() {
   const isConnected = piSession.status === "connected";
   const parsedAmount = parseFloat(amount);
   const amountValid = !isNaN(parsedAmount) && parsedAmount >= 0.001;
-
   const config = ASSET_CONFIGS[selectedTab];
 
   useEffect(() => {
     return () => {
-      if (pollIntervalRef.current !== null) {
-        clearInterval(pollIntervalRef.current);
-      }
-      if (simTimerRef.current !== null) {
-        clearTimeout(simTimerRef.current);
-      }
+      if (pollIntervalRef.current !== null) clearInterval(pollIntervalRef.current);
+      if (simTimerRef.current !== null) clearTimeout(simTimerRef.current);
     };
   }, []);
 
@@ -121,32 +150,17 @@ export function UniversalDepositComponent() {
       setSimulationFee(null);
       return;
     }
-
-    if (simTimerRef.current !== null) {
-      clearTimeout(simTimerRef.current);
-    }
-
+    if (simTimerRef.current !== null) clearTimeout(simTimerRef.current);
     setSimulationStatus("simulating");
-
     simTimerRef.current = setTimeout(() => {
       const userAddress = piSession.user?.walletAddress ?? "";
       simulateVaultDeposit(userAddress, parsedAmount)
         .then((result) => {
-          if (result.skipped) {
-            setSimulationStatus("idle");
-            setSimulationFee(null);
-          } else if (result.success) {
-            setSimulationStatus("ok");
-            setSimulationFee(result.minFee);
-          } else {
-            setSimulationStatus("error");
-            setSimulationFee(null);
-          }
+          if (result.skipped) { setSimulationStatus("idle"); setSimulationFee(null); }
+          else if (result.success) { setSimulationStatus("ok"); setSimulationFee(result.minFee); }
+          else { setSimulationStatus("error"); setSimulationFee(null); }
         })
-        .catch(() => {
-          setSimulationStatus("error");
-          setSimulationFee(null);
-        });
+        .catch(() => { setSimulationStatus("error"); setSimulationFee(null); });
     }, 600);
   }, [selectedTab, amountValid, parsedAmount, isConnected, piSession.user?.uid]);
 
@@ -154,11 +168,9 @@ export function UniversalDepositComponent() {
     (depositId: string, minConfirmations: number) => {
       if (!isConnected || !piSession.luminaJwt) return;
       const jwt = piSession.luminaJwt;
-
       pollIntervalRef.current = setInterval(async () => {
         try {
           const status = await pollDepositStatus(depositId, jwt);
-
           const updated: CrossChainDepositState = {
             depositId: status.depositId,
             chain: status.chain,
@@ -173,10 +185,8 @@ export function UniversalDepositComponent() {
             failureReason: status.failureReason ?? null,
             updatedAt: new Date(status.updatedAt * 1000).toISOString(),
           };
-
           setActiveDeposit(updated);
           upsertCrossChainDeposit(updated);
-
           if (isTerminalStatus(status.status)) {
             if (pollIntervalRef.current !== null) {
               clearInterval(pollIntervalRef.current);
@@ -193,10 +203,8 @@ export function UniversalDepositComponent() {
 
   const handleDeposit = useCallback(async () => {
     if (!isConnected || !amountValid) return;
-
     setDepositError(null);
     setIsLoading(true);
-
     try {
       if (selectedTab === "PI") {
         initiateDeposit({ amount: parsedAmount });
@@ -204,15 +212,10 @@ export function UniversalDepositComponent() {
         if (!piSession.luminaJwt || !piSession.user) {
           throw new Error("No Lumina JWT — re-authenticate and try again.");
         }
-
         const provisionedVaultId = useLuminaStore.getState().vaultId;
-
         if (!provisionedVaultId) {
-          throw new Error(
-            "No provisioned vault ID found — complete vault setup and try again.",
-          );
+          throw new Error("No provisioned vault ID — complete vault setup first.");
         }
-
         const response = await requestDepositAddress({
           vaultId: provisionedVaultId,
           chain: config.chain as CrossChainID,
@@ -220,7 +223,6 @@ export function UniversalDepositComponent() {
           expectedAmount: parsedAmount.toString(),
           jwt: piSession.luminaJwt,
         });
-
         const depositState: CrossChainDepositState = {
           depositId: response.depositId,
           chain: response.chain,
@@ -235,35 +237,21 @@ export function UniversalDepositComponent() {
           failureReason: null,
           updatedAt: new Date().toISOString(),
         };
-
         setActiveDeposit(depositState);
         upsertCrossChainDeposit(depositState);
-
         startPolling(response.depositId, response.minConfirmations);
       }
     } catch (err) {
       const message =
-        err instanceof OmnichainServiceError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Unknown error — see console.";
+        err instanceof OmnichainServiceError ? err.message
+        : err instanceof Error ? err.message
+        : "Unknown error — see console.";
       console.error("[Lumina] Deposit initiation failed:", err);
       setDepositError(message);
     } finally {
       setIsLoading(false);
     }
-  }, [
-    isConnected,
-    amountValid,
-    selectedTab,
-    parsedAmount,
-    config,
-    piSession,
-    initiateDeposit,
-    upsertCrossChainDeposit,
-    startPolling,
-  ]);
+  }, [isConnected, amountValid, selectedTab, parsedAmount, config, piSession, initiateDeposit, upsertCrossChainDeposit, startPolling]);
 
   const handleTabChange = useCallback((tab: AssetTab) => {
     setSelectedTab(tab);
@@ -275,226 +263,258 @@ export function UniversalDepositComponent() {
     }
   }, []);
 
+  const confirmedPiTx = selectedTab === "PI"
+    ? Object.values(pendingPayments).find((p) => p.status === "confirmed" && p.sorobanTxHash)
+    : null;
+
   return (
-    <section className="rounded-2xl border border-[#F0C040]/20 bg-[#0F0F1A] p-6 shadow-lg shadow-black/40">
-      <h2 className="mb-1 text-lg font-semibold tracking-widest text-[#F0C040] uppercase">
-        Universal Deposit
-      </h2>
-      <p className="mb-6 text-xs text-white/40">
-        Deposit native π or any supported omnichain asset into your Lumina vault.
+    <section className="glass-card rounded-2xl p-6 h-full flex flex-col">
+      <div className="flex items-center gap-2 mb-1">
+        <ArrowDownToLine className="h-4 w-4 text-[#F0C040]" />
+        <h2 className="text-sm font-bold tracking-[0.15em] text-[#F0C040] uppercase">
+          Universal Deposit
+        </h2>
+      </div>
+      <p className="mb-5 text-xs text-white/35">
+        Deposit native π or any supported chain asset into your vault
       </p>
 
-      <div className="mb-6 grid grid-cols-4 gap-3">
-        {(
-          [
-            { label: "π  Pi",  value: balances.pi },
-            { label: "piBTC",  value: balances.piBTC },
-            { label: "piETH",  value: balances.piETH },
-            { label: "piUSDT", value: balances.piUSDT },
-          ] as const
-        ).map(({ label, value }) => (
-          <div
-            key={label}
-            className="flex flex-col items-center rounded-xl border border-white/5 bg-[#0A0A0F] py-4"
-          >
-            <span className="text-[10px] font-medium tracking-widest text-white/40 uppercase">
-              {label}
-            </span>
-            <span className="mt-1 font-mono text-xl font-bold text-[#F0C040]">
-              {value}
-            </span>
-          </div>
-        ))}
+      <div className="relative mb-5 flex rounded-xl p-1"
+        style={{ background: "rgba(10,10,15,0.7)", border: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        {ASSET_TABS.map((tab) => {
+          const cfg = ASSET_CONFIGS[tab];
+          return (
+            <button
+              key={tab}
+              onClick={() => handleTabChange(tab)}
+              aria-pressed={selectedTab === tab}
+              className="relative flex-1 rounded-lg py-2.5 z-10 transition-colors duration-150"
+            >
+              {selectedTab === tab && (
+                <motion.div
+                  layoutId="tab-indicator"
+                  className="absolute inset-0 rounded-lg"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(240,192,64,0.18) 0%, rgba(240,192,64,0.08) 100%)",
+                    border: "1px solid rgba(240,192,64,0.3)",
+                  }}
+                  transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                />
+              )}
+              <span className={[
+                "relative flex flex-col items-center gap-0.5 text-[11px] font-bold tracking-wide",
+                selectedTab === tab ? cfg.accentColor : "text-white/30",
+              ].join(" ")}>
+                <span className="text-base leading-none">{cfg.icon}</span>
+                <span>{tab}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="mb-4 flex gap-2">
-        {ASSET_TABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => handleTabChange(tab)}
-            aria-pressed={selectedTab === tab}
-            className={[
-              "flex-1 rounded-xl py-2 text-xs font-semibold tracking-widest uppercase transition-all duration-150",
-              selectedTab === tab
-                ? "bg-[#F0C040] text-[#0A0A0F]"
-                : "border border-white/10 text-white/40 hover:border-[#F0C040]/30 hover:text-white/60",
-            ].join(" ")}
-          >
-            {ASSET_CONFIGS[tab].label}
-          </button>
-        ))}
-      </div>
-
-      <p className="mb-4 text-[10px] text-white/40">{config.description}</p>
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={selectedTab}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2 }}
+          className="mb-5 text-[11px] text-white/35 flex items-center gap-1.5"
+        >
+          <Info className="h-3 w-3 shrink-0 text-white/20" />
+          {config.description}
+        </motion.p>
+      </AnimatePresence>
 
       {isConnected && (
         <div className="mb-4">
           <label
             htmlFor="deposit-amount"
-            className="mb-1 block text-[10px] font-medium tracking-widest text-white/40 uppercase"
+            className="mb-1.5 flex items-center justify-between text-[10px] font-semibold tracking-widest text-white/30 uppercase"
           >
-            Amount ({config.symbol})
+            <span>Amount ({config.symbol})</span>
+            {amountValid && (
+              <span className="text-[#F0C040]/60 font-mono normal-case">
+                {parsedAmount.toFixed(3)} {config.symbol}
+              </span>
+            )}
           </label>
           <input
             id="deposit-amount"
             type="number"
             value={amount}
-            onChange={(e) => {
-              setDepositError(null);
-              setAmount(e.target.value);
-            }}
+            onChange={(e) => { setDepositError(null); setAmount(e.target.value); }}
             min="0.001"
             step="0.001"
             placeholder="0.000"
             aria-label={`Deposit amount in ${config.symbol}`}
             className={[
-              "w-full rounded-xl border bg-[#0A0A0F] px-4 py-2 font-mono text-sm text-[#E8E8F0]",
-              "placeholder-white/20 outline-none transition-colors",
-              "focus:border-[#F0C040]/50 focus:ring-1 focus:ring-[#F0C040]/20",
-              amountValid || amount === ""
-                ? "border-white/10"
-                : "border-red-500/50",
+              "input-lumina w-full rounded-xl px-4 py-3 font-mono text-lg font-bold",
+              !amountValid && amount !== "" ? "border-red-500/40 focus:border-red-500/60" : "",
             ].join(" ")}
           />
         </div>
       )}
 
-      <div className="mb-4 rounded-xl border border-white/5 bg-[#0A0A0F] px-4 py-3">
-        <p className="mb-1 text-[10px] font-medium tracking-widest text-white/30 uppercase">
-          Vault Contract
-        </p>
-        <p className="truncate font-mono text-[10px] text-[#F0C040]/70">
-          {LUMINA_CONTRACTS.VAULT}
-        </p>
-        <p className="mt-1 text-[10px] text-white/20">
-          {PI_NETWORK_CONFIG.isSandbox ? "π Testnet" : "π Mainnet"} · Soroban
-        </p>
+      <div className="mb-4 rounded-xl px-4 py-3"
+        style={{ background: "rgba(10,10,15,0.7)", border: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[10px] font-semibold tracking-widest text-white/25 uppercase">
+            Vault Contract
+          </p>
+          <span className="text-[10px] text-white/20 flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#F0C040]/40" />
+            {PI_NETWORK_CONFIG.isSandbox ? "Testnet" : "Mainnet"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <p className="truncate font-mono text-[11px] text-[#F0C040]/55 flex-1">
+            {LUMINA_CONTRACTS.VAULT}
+          </p>
+          <CopyButton text={LUMINA_CONTRACTS.VAULT} />
+        </div>
       </div>
 
       {selectedTab === "PI" && isConnected && amountValid && (
-        <div className="mb-4 flex items-center gap-2">
-          {simulationStatus === "simulating" && (
-            <span className="text-[10px] text-white/30">Simulating contract call…</span>
-          )}
-          {simulationStatus === "ok" && (
-            <span className="text-[10px] text-emerald-400/70">
-              ✓ Vault simulation passed
-              {simulationFee ? ` · est. fee ${simulationFee} stroops` : ""}
-            </span>
-          )}
-          {simulationStatus === "error" && (
-            <span className="text-[10px] text-amber-400/60">
-              ⚠ Simulation unavailable (testnet RPC unreachable)
-            </span>
-          )}
-        </div>
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-4 overflow-hidden"
+          >
+            <div className={[
+              "flex items-center gap-2 rounded-xl px-3 py-2 text-[10px]",
+              simulationStatus === "ok" ? "bg-emerald-400/8 border border-emerald-400/15" :
+              simulationStatus === "error" ? "bg-amber-400/8 border border-amber-400/15" :
+              "bg-white/[0.03] border border-white/[0.06]",
+            ].join(" ")}>
+              {simulationStatus === "simulating" && (
+                <><Loader2 className="h-3 w-3 animate-spin text-white/30" /><span className="text-white/30">Simulating contract call…</span></>
+              )}
+              {simulationStatus === "ok" && (
+                <><CheckCircle2 className="h-3 w-3 text-emerald-400" /><span className="text-emerald-400/80">Simulation passed{simulationFee ? ` · est. ${simulationFee} stroops` : ""}</span></>
+              )}
+              {simulationStatus === "error" && (
+                <><AlertTriangle className="h-3 w-3 text-amber-400/70" /><span className="text-amber-400/60">Simulation unavailable (RPC unreachable)</span></>
+              )}
+            </div>
+          </motion.div>
+        </AnimatePresence>
       )}
 
-      {selectedTab === "PI" && (() => {
-        const confirmedPi = Object.values(pendingPayments).find(
-          (p) => p.status === "confirmed" && p.sorobanTxHash,
-        );
-        return confirmedPi?.sorobanTxHash ? (
-          <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-            <p className="mb-1 text-[10px] font-medium tracking-widest text-emerald-400/60 uppercase">
-              Last Soroban tx
-            </p>
-            <p className="truncate font-mono text-[10px] text-emerald-400">
-              {confirmedPi.sorobanTxHash}
-            </p>
-          </div>
-        ) : null;
-      })()}
-
-      {depositError && (
-        <p
-          role="alert"
-          className="mb-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+      {confirmedPiTx?.sorobanTxHash && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 rounded-xl px-4 py-3 border border-emerald-500/20 bg-emerald-500/5"
         >
-          {depositError}
-        </p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[10px] font-semibold tracking-widest text-emerald-400/60 uppercase">
+              Last confirmed tx
+            </p>
+            <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+          </div>
+          <div className="flex items-center gap-2">
+            <p className="truncate font-mono text-[11px] text-emerald-400 flex-1">
+              {confirmedPiTx.sorobanTxHash}
+            </p>
+            <CopyButton text={confirmedPiTx.sorobanTxHash} />
+          </div>
+        </motion.div>
       )}
 
-      {activeDeposit && selectedTab !== "PI" && (
-        <div className="mb-4 rounded-xl border border-white/10 bg-[#0A0A0F] p-4">
-          <p className="mb-2 text-[10px] font-medium tracking-widest text-white/40 uppercase">
-            Send {config.symbol} to this address on {activeDeposit.chain}
-          </p>
-          <p className="break-all font-mono text-xs text-[#F0C040]">
-            {activeDeposit.depositAddress}
-          </p>
+      <AnimatePresence>
+        {depositError && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            role="alert"
+            className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3"
+          >
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-400 mt-0.5" />
+            <p className="text-xs text-red-400">{depositError}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          <p className="mt-2 text-[10px] text-amber-400/70">
-            ⚠ Send funds once only to this address. Multiple deposits require
-            operator-assisted recovery.
-          </p>
-
-          <div className="mt-3 flex items-center gap-2">
-            <span
-              className={[
-                "text-[10px] font-medium",
-                STATUS_COLOR[activeDeposit.status] ?? "text-white/40",
-              ].join(" ")}
-            >
-              {STATUS_LABEL[activeDeposit.status] ?? activeDeposit.status}
-            </span>
-            {activeDeposit.status === "detected" &&
-              activeDeposit.confirmations > 0 && (
-                <span className="text-[10px] text-white/30">
-                  ({activeDeposit.confirmations} / {activeDeposit.minConfirmations} confirmations)
+      <AnimatePresence>
+        {activeDeposit && selectedTab !== "PI" && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 rounded-xl p-4"
+            style={{ background: "rgba(10,10,15,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}
+          >
+            <p className="mb-2 text-[10px] font-semibold tracking-widest text-white/35 uppercase">
+              Send {config.symbol} to this address on {activeDeposit.chain}
+            </p>
+            <div className="flex items-start gap-2 rounded-lg bg-[#F0C040]/5 border border-[#F0C040]/15 px-3 py-2.5 mb-3">
+              <p className="break-all font-mono text-[11px] text-[#F0C040] flex-1 leading-relaxed">
+                {activeDeposit.depositAddress}
+              </p>
+              <CopyButton text={activeDeposit.depositAddress} />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className={`text-[10px] font-semibold ${STATUS_COLOR[activeDeposit.status] ?? "text-white/40"}`}>
+                {STATUS_LABEL[activeDeposit.status] ?? activeDeposit.status}
+              </span>
+              {activeDeposit.status === "detected" && activeDeposit.confirmations > 0 && (
+                <span className="text-[10px] text-white/25">
+                  {activeDeposit.confirmations}/{activeDeposit.minConfirmations} confs
                 </span>
               )}
-          </div>
+            </div>
+            {activeDeposit.failureReason && (
+              <p className="mt-1.5 text-[10px] text-red-400/80">{activeDeposit.failureReason}</p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          {activeDeposit.sorobanTxHash && (
-            <p className="mt-1 truncate text-[10px] text-emerald-400/60">
-              Soroban tx: {activeDeposit.sorobanTxHash}
-            </p>
+      <div className="mt-auto pt-2">
+        <motion.button
+          onClick={handleDeposit}
+          disabled={!isConnected || !amountValid || isLoading}
+          whileHover={isConnected && amountValid && !isLoading ? { scale: 1.02 } : {}}
+          whileTap={isConnected && amountValid && !isLoading ? { scale: 0.98 } : {}}
+          className={[
+            "w-full rounded-xl py-3.5 text-sm font-black tracking-[0.12em] uppercase flex items-center justify-center gap-2",
+            isConnected && amountValid && !isLoading
+              ? "btn-gold-shimmer cursor-pointer"
+              : "cursor-not-allowed",
+          ].join(" ")}
+          style={!(isConnected && amountValid && !isLoading) ? {
+            background: "rgba(240,192,64,0.08)",
+            border: "1px solid rgba(240,192,64,0.15)",
+            color: "rgba(240,192,64,0.3)",
+          } : {}}
+        >
+          {isLoading ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Generating address…</>
+          ) : isConnected ? (
+            <>
+              <Zap className="h-4 w-4" />
+              {selectedTab === "PI"
+                ? "Initiate Pi Deposit"
+                : activeDeposit && !isTerminalStatus(activeDeposit.status)
+                  ? "Deposit in Progress"
+                  : `Get ${config.symbol} Address`}
+            </>
+          ) : (
+            "Connect Pi Wallet to Continue"
           )}
-          {activeDeposit.failureReason && (
-            <p className="mt-1 text-[10px] text-red-400/80">
-              {activeDeposit.failureReason}
-            </p>
-          )}
-        </div>
-      )}
-
-      <button
-        onClick={handleDeposit}
-        disabled={!isConnected || !amountValid || isLoading}
-        aria-label={
-          !isConnected
-            ? "Connect Pi Wallet to continue"
-            : amountValid
-              ? `Initiate ${config.symbol} vault deposit of ${parsedAmount}`
-              : "Enter a valid deposit amount to continue"
-        }
-        className={[
-          "w-full rounded-xl py-3 text-sm font-semibold tracking-widest uppercase transition-all duration-150",
-          isConnected && amountValid && !isLoading
-            ? "cursor-pointer bg-[#F0C040] text-[#0A0A0F] hover:bg-[#F0C040]/90"
-            : "cursor-not-allowed bg-[#F0C040]/10 text-[#F0C040]/40",
-        ].join(" ")}
-      >
-        {isLoading
-          ? "Generating address…"
-          : isConnected
-            ? selectedTab === "PI"
-              ? "Initiate Deposit"
-              : activeDeposit && !isTerminalStatus(activeDeposit.status)
-                ? "Deposit in Progress"
-                : `Get ${config.symbol} Deposit Address`
-            : "Connect Pi Wallet to Continue"}
-      </button>
+        </motion.button>
+      </div>
     </section>
   );
 }
 
 function assetToWrapped(asset: CrossChainAsset): string {
-  const map: Record<CrossChainAsset, string> = {
-    ETH:  "piETH",
-    BTC:  "piBTC",
-    USDT: "piUSDT",
-  };
+  const map: Record<CrossChainAsset, string> = { ETH: "piETH", BTC: "piBTC", USDT: "piUSDT" };
   return map[asset] ?? asset;
 }

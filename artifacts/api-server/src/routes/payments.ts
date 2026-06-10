@@ -1,6 +1,5 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import jwt from "jsonwebtoken";
 import { logger } from "../lib/logger";
 import { invokeSorobanDeposit } from "../lib/sorobanClient";
 import { NETWORK_CONFIG } from "../lib/networkConfig";
@@ -49,33 +48,7 @@ async function fetchPiPayment(paymentId: string): Promise<PiPaymentResponse | nu
   }
 }
 
-function requireLuminaJwt(req: Request, res: Response): string | null {
-  const auth = req.headers["authorization"];
-  if (!auth || !auth.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Missing Lumina JWT" });
-    return null;
-  }
-
-  const token = auth.slice(7);
-  const secret = process.env["LUMINA_JWT_SECRET"];
-  if (!secret) {
-    res.status(500).json({ error: "Server misconfiguration" });
-    return null;
-  }
-
-  try {
-    jwt.verify(token, secret, { issuer: "lumina" });
-    return token;
-  } catch {
-    res.status(401).json({ error: "Invalid or expired Lumina JWT" });
-    return null;
-  }
-}
-
 router.post("/v1/payments/:id/approve", async (req: Request, res: Response) => {
-  const token = requireLuminaJwt(req, res);
-  if (!token) return;
-
   const paymentId = req.params["id"] as string;
 
   const payment = await fetchPiPayment(paymentId);
@@ -90,9 +63,6 @@ router.post("/v1/payments/:id/approve", async (req: Request, res: Response) => {
 });
 
 router.post("/v1/payments/:id/complete", async (req: Request, res: Response) => {
-  const token = requireLuminaJwt(req, res);
-  if (!token) return;
-
   const paymentId = req.params["id"] as string;
   const { txid: clientTxid } = req.body as { txid?: string };
 

@@ -153,7 +153,7 @@ export default function ConnectScreen() {
               <Text style={[styles.sessionValue, { color: colors.success }]}>Active</Text>
             </View>
             <View style={[styles.sessionRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-              <MaterialCommunityIcons name="vault" size={14} color={colors.mutedForeground} />
+              <MaterialCommunityIcons name="safe" size={14} color={colors.mutedForeground} />
               <Text style={[styles.sessionLabel, { color: colors.mutedForeground }]}>Vault</Text>
               <View style={[styles.tokenDot, { backgroundColor: colors.success }]} />
               <Text style={[styles.sessionValue, { color: colors.success }]}>Provisioned</Text>
